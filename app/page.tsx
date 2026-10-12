@@ -1,69 +1,155 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import Hero from "@/components/Hero";
+import ToolCard from "@/components/ToolCard";
+import ToolWorkspace from "@/components/ToolWorkspace";
+import PythonBackendSpecModal from "@/components/PythonBackendSpecModal";
+import Footer from "@/components/Footer";
+import { TOOLS_CONFIG } from "@/data/tools";
+import { ToolId } from "@/types/tools";
+import { ArrowRight, Zap } from "lucide-react";
+
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const initialToolParam = searchParams.get("tool") as ToolId | null;
+
+  const [activeToolId, setActiveToolId] = useState<ToolId | null>(
+    TOOLS_CONFIG.some((t) => t.id === initialToolParam)
+      ? initialToolParam
+      : null
+  );
+  const [isBackendModalOpen, setIsBackendModalOpen] = useState(false);
+
+  // Sync with search params if changed
+  useEffect(() => {
+    const param = searchParams.get("tool") as ToolId | null;
+    if (param && TOOLS_CONFIG.some((t) => t.id === param)) {
+      setActiveToolId(param);
+    }
+  }, [searchParams]);
+
+  const activeTool = TOOLS_CONFIG.find((t) => t.id === activeToolId) || null;
+
+  const handleSelectTool = (id: ToolId | null) => {
+    setActiveToolId(id);
+    if (id) {
+      window.history.pushState(null, "", `?tool=${id}`);
+      window.scrollTo(0, 0);
+    } else {
+      window.history.pushState(null, "", "/");
+      window.scrollTo(0, 0);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#fafafc]">
+      {/* Navigation Bar: Simple PDF on left, TFRENZY company logo on the right */}
+      <Navbar
+        activeTool={activeToolId}
+        onSelectTool={handleSelectTool}
+        onOpenBackendModal={() => setIsBackendModalOpen(true)}
+      />
+
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col">
+        {activeTool ? (
+          <ToolWorkspace
+            tool={activeTool}
+            onBack={() => handleSelectTool(null)}
+            onOpenBackendModal={() => setIsBackendModalOpen(true)}
+          />
+        ) : (
+          <div className="flex-1 flex flex-col">
+            {/* Hero Section */}
+            <Hero onSelectTool={handleSelectTool} />
+
+            {/* Core 5 Tools Grid - Task For Today */}
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-zinc-900">
+                    Core PDF Tools
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Click any tool to start converting, merging, or compressing
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 bg-orange-50 text-[#ea580c] border border-orange-200/60 rounded-full">
+                  5 Tools Available
+                </span>
+              </div>
+
+              {/* Grid: Exactly the 5 requested tools */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+                {TOOLS_CONFIG.map((tool) => (
+                  <ToolCard
+                    key={tool.id}
+                    tool={tool}
+                    onSelect={() => handleSelectTool(tool.id)}
+                  />
+                ))}
+
+                {/* 6th Card: Python Backend Engine Callout */}
+                <div
+                  onClick={() => setIsBackendModalOpen(true)}
+                  className="group relative flex flex-col justify-between p-6 sm:p-7 bg-gradient-to-br from-orange-500/10 via-orange-500/5 to-transparent rounded-2xl border border-orange-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_14px_28px_rgba(234,88,12,0.12)] transition-all duration-200 hover:-translate-y-1.5 cursor-pointer text-left"
+                >
+                  <div>
+                    <div className="w-12 h-12 rounded-xl bg-orange-100 text-[#ea580c] flex items-center justify-center mb-4">
+                      <Zap className="w-6 h-6" />
+                    </div>
+                    <div className="inline-block px-2 py-0.5 bg-orange-100 text-[#ea580c] text-[10px] font-extrabold rounded-md uppercase tracking-wide mb-2">
+                      Ready For Backend
+                    </div>
+                    <h3 className="text-lg font-bold text-zinc-900 mb-2">
+                      Python Backend Engine
+                    </h3>
+                    <p className="text-xs text-zinc-600 leading-relaxed">
+                      All 5 core tools are pre-configured to hook into your FastAPI/Flask Python backend whenever you are ready.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-orange-200/60 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-[#ea580c]">
+                      Explore Python API
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-[#ea580c] group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <Footer
+        onSelectTool={handleSelectTool}
+        onOpenBackendModal={() => setIsBackendModalOpen(true)}
+      />
+
+      {/* Python Backend Spec Modal */}
+      <PythonBackendSpecModal
+        isOpen={isBackendModalOpen}
+        onClose={() => setIsBackendModalOpen(false)}
+      />
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#fafafc]">
+          <div className="w-8 h-8 border-3 border-[#ea580c] border-t-transparent rounded-full animate-spin" />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }
