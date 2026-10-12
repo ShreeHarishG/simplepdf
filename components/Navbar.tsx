@@ -76,7 +76,7 @@ function NavbarComponent({
             </nav>
           </div>
 
-          {/* RIGHT: Company Logo (TFRENZY) & Python Backend status */}
+          {/* RIGHT: Live Python Backend status & Logo */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             {/* Live Python Backend Status Indicator */}
             <button

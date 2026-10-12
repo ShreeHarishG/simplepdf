@@ -368,7 +368,7 @@ export default function ToolWorkspace({
 
     // Fallback demo blob
     let mimeType = "application/pdf";
-    let content = "%PDF-1.4\n%Simple PDF by TFRENZY Export (Demo Mode)\n";
+    let content = "%PDF-1.4\n%Simple PDF Export (Demo Mode)\n";
 
     if (downloadFileName.endsWith(".docx")) {
       mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -548,7 +548,7 @@ export default function ToolWorkspace({
               </div>
             )}
 
-            {/* BIG ACTION DOWNLOAD BUTTON in TFRENZY ORANGE */}
+            {/* BIG ACTION DOWNLOAD BUTTON in BRAND ORANGE */}
             <button
               onClick={handleDownload}
               className="w-full py-4 px-8 rounded-xl text-white bg-[#ea580c] hover:bg-[#c2410c] text-lg font-bold shadow-lg shadow-orange-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-3 cursor-pointer"
@@ -574,7 +574,7 @@ export default function ToolWorkspace({
               </button>
             </div>
 
-            {/* TFRENZY Note */}
+            {/* Engine Note */}
             <div className="mt-8 pt-4 border-t border-zinc-200/80 text-xs text-zinc-500 flex items-center gap-1.5">
               <Info className="w-3.5 h-3.5 text-zinc-400" />
               <span>
@@ -612,7 +612,7 @@ export default function ToolWorkspace({
             <div className="text-xs font-bold text-zinc-600">{progress}%</div>
           </div>
         ) : files.length === 0 ? (
-          /* STATE 3: DROPZONE WITH TFRENZY ORANGE ACTION BUTTON */
+          /* STATE 3: DROPZONE WITH ORANGE ACTION BUTTON */
           <div className="flex-1 flex flex-col items-center justify-center py-12 px-4 text-center">
             {/* Hidden File Input */}
             <input
@@ -633,7 +633,7 @@ export default function ToolWorkspace({
                 {tool.tagline}
               </p>
 
-              {/* Big TFRENZY Orange Action Button */}
+              {/* Big Brand Orange Action Button */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full sm:w-80 py-5 px-8 rounded-2xl text-white bg-[#ea580c] hover:bg-[#c2410c] text-xl font-bold shadow-xl shadow-orange-500/20 hover:shadow-orange-500/30 transition-all transform active:scale-98 flex items-center justify-center gap-3 cursor-pointer"
@@ -1195,7 +1195,7 @@ export default function ToolWorkspace({
                 )}
               </div>
 
-              {/* Action Button - Always Prominent TFRENZY Orange */}
+              {/* Action Button - Brand Orange */}
               <div className="mt-8 pt-4 border-t border-zinc-100">
                 {/* Live Backend Connection Chip */}
                 {isOnline === true ? (

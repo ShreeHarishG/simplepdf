@@ -1,7 +1,7 @@
 # backend/main.py
 """
 Simple PDF Engine - Backend API
-Built for TFRENZY Simple PDF
+Built for Simple PDF
 
 Architecture Mapping:
 --------------------------------------------------------------------------------------
@@ -40,7 +40,7 @@ import pypdf
 from PIL import Image
 
 app = FastAPI(
-    title="Simple PDF API - TFRENZY",
+    title="Simple PDF API",
     description="Online PDF toolkit backend engine using pypdf, pdf2docx, PyMuPDF, pdfplumber, and ReportLab",
     version="2.0.0",
 )
@@ -61,7 +61,7 @@ TEMP_DIR = tempfile.gettempdir()
 def health_check():
     return {
         "status": "online",
-        "service": "Simple PDF Backend Engine (TFRENZY)",
+        "service": "Simple PDF Backend Engine",
         "tool_matrix": {
             "merge_pdf": {"library": "pypdf", "dependency": "Native Python"},
             "compress_pdf": {"library": "pypdf", "dependency": "Native Python"},
@@ -398,6 +398,6 @@ async def watermark_pdf(
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    print(f"Starting TFRENZY Simple PDF Backend on http://0.0.0.0:{port} ...")
+    print(f"Starting Simple PDF Backend on http://0.0.0.0:{port} ...")
     uvicorn.run("backend.main:app", host="0.0.0.0", port=port, reload=False)
 

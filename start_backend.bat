@@ -1,7 +1,7 @@
 @echo off
-title Simple PDF - Python Backend Suite (TFRENZY)
+title Simple PDF - Python Backend Suite
 echo ========================================================
-echo   TFRENZY Simple PDF - Starting Python Backend Suite
+echo   Simple PDF - Starting Python Backend Suite
 echo   Host: http://localhost:8000
 echo   API Docs: http://localhost:8000/docs
 echo ========================================================

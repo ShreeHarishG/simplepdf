@@ -46,7 +46,7 @@ function HomeContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fafafc]">
-      {/* Navigation Bar: Simple PDF on left, TFRENZY company logo on the right */}
+      {/* Navigation Bar: Simple PDF Header */}
       <Navbar
         activeTool={activeToolId}
         onSelectTool={handleSelectTool}
