@@ -25,29 +25,23 @@ function NavbarComponent({
     <header className="sticky top-0 z-40 w-full bg-white/95 border-b border-zinc-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-md shrink-0">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18 sm:h-20 shrink-0">
-          {/* LEFT: Simple PDF Branding using TFRENZY Orange */}
+          {/* LEFT: Simple PDF Branding */}
           <div className="flex items-center gap-6 lg:gap-8 shrink-0">
             <button
               onClick={() => onSelectTool(null)}
               className="flex items-center gap-2.5 group text-left cursor-pointer transition-transform active:scale-98 select-none"
               title="Simple PDF Home"
             >
-              {/* TFRENZY Orange Hexagon Icon */}
+              {/* Clean Orange Hexagon Emblem */}
               <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
-                <svg viewBox="0 0 100 100" className="w-full h-full fill-none drop-shadow-xs">
-                  <polygon
-                    points="50,4 90,26 90,74 50,96 10,74 10,26"
-                    fill="#ea580c"
-                  />
-                  <polygon
-                    points="50,20 76,34 76,66 50,80 24,66 24,34"
-                    fill="#ffffff"
-                  />
-                  <polygon
-                    points="50,32 66,41 66,59 50,68 34,59 34,41"
-                    fill="#ea580c"
-                  />
-                </svg>
+                <Image
+                  src="/logo-emblem.png"
+                  alt="Simple PDF"
+                  fill
+                  sizes="36px"
+                  className="object-contain drop-shadow-2xs"
+                  priority
+                />
               </div>
 
               {/* Brand Typography */}
@@ -133,20 +127,20 @@ function NavbarComponent({
               )}
             </button>
 
-            {/* TFRENZY Company Logo on Right Side */}
+            {/* Clean Emblem Icon on Right Side */}
             <div className="flex items-center pl-3 sm:pl-4 border-l border-zinc-200 shrink-0">
               <div
                 onClick={() => onSelectTool(null)}
                 className="cursor-pointer flex items-center transition-opacity hover:opacity-90 select-none"
-                title="TFRENZY - प्रौद्योगिकी करणीयम्"
+                title="Simple PDF"
               >
-                <div className="relative h-10 sm:h-12 w-36 sm:w-44 flex items-center justify-end shrink-0">
+                <div className="relative h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center shrink-0">
                   <Image
-                    src="/tfrenzy-logo.png"
-                    alt="TFRENZY Logo"
+                    src="/logo-emblem.png"
+                    alt="Simple PDF Emblem"
                     fill
-                    sizes="(max-width: 640px) 144px, 176px"
-                    className="object-contain object-right"
+                    sizes="36px"
+                    className="object-contain"
                     priority
                   />
                 </div>

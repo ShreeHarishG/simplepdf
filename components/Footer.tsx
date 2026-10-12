@@ -88,21 +88,21 @@ export default function Footer({
 
             <p className="text-xs sm:text-sm text-zinc-500 max-w-sm leading-relaxed">
               Online document tools designed with simplicity. Effortlessly merge,
-              compress, and convert your documents with TFRENZY.
+              compress, and convert your documents securely with zero limits.
             </p>
 
-            {/* Company Logo in Footer */}
-            <div className="pt-2 flex items-center gap-3">
-              <span className="text-xs text-zinc-400 font-medium">Powered by:</span>
-              <div className="relative h-9 w-36">
+            {/* Emblem in Footer */}
+            <div className="pt-2 flex items-center gap-2.5">
+              <div className="relative h-7 w-7">
                 <Image
-                  src="/tfrenzy-logo.png"
-                  alt="TFRENZY"
+                  src="/logo-emblem.png"
+                  alt="Simple PDF Emblem"
                   fill
-                  sizes="144px"
-                  className="object-contain object-left"
+                  sizes="28px"
+                  className="object-contain"
                 />
               </div>
+              <span className="text-xs text-zinc-600 font-semibold">Simple PDF Toolkit</span>
             </div>
           </div>
 
@@ -145,9 +145,9 @@ export default function Footer({
 
         {/* Bottom Bar */}
         <div className="mt-10 pt-6 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-400 gap-3">
-          <p>© 2026 Simple PDF by TFRENZY. All rights reserved.</p>
+          <p>© 2026 Simple PDF. All rights reserved.</p>
           <p className="flex items-center gap-1">
-            Developed with <Sparkles className="w-3.5 h-3.5 text-[#ea580c]" /> for TFRENZY (प्रौद्योगिकी करणीयम्)
+            Developed with <Sparkles className="w-3.5 h-3.5 text-[#ea580c]" /> for fast, secure document processing
           </p>
         </div>
       </div>

@@ -11,10 +11,10 @@ interface HeroProps {
 export default function Hero({ onSelectTool }: HeroProps) {
   return (
     <section className="pt-10 pb-8 sm:pt-14 sm:pb-12 text-center px-4 max-w-5xl mx-auto">
-      {/* Simple PDF by TFRENZY Pill */}
+      {/* Simple PDF Pill */}
       <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-50 border border-orange-200 text-xs sm:text-sm font-semibold text-[#ea580c] mb-6 shadow-2xs">
         <Sparkles className="w-3.5 h-3.5 text-[#ea580c]" />
-        <span>Simple PDF by TFRENZY</span>
+        <span>Simple PDF</span>
         <span className="text-orange-200">|</span>
         <span className="text-zinc-600 font-medium">Task for today: 5 Core Tools</span>
       </div>
@@ -26,7 +26,7 @@ export default function Hero({ onSelectTool }: HeroProps) {
 
       {/* Subtitle */}
       <p className="mt-4 sm:mt-5 text-base sm:text-lg text-zinc-600 max-w-2xl mx-auto leading-relaxed">
-        Simple, fast, and 100% free online document toolkit by TFRENZY. Merge,
+        Simple, fast, and 100% free online document toolkit. Merge,
         compress, convert Word, and transform photos in just a few clicks.
       </p>
 

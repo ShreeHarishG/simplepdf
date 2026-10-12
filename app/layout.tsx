@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Simple PDF | Online PDF Tools by TFRENZY",
-  description: "Simple PDF by TFRENZY. Merge PDF, Compress PDF, PDF to Word, Word to PDF, and Photo to PDF. Clean, fast, free, and secure document toolkit.",
+  title: "Simple PDF | Online PDF Tools",
+  description: "Simple PDF. Merge PDF, Compress PDF, PDF to Word, Word to PDF, and Photo to PDF. Clean, fast, free, and secure document toolkit.",
   icons: {
     icon: "/favicon.ico",
   },
