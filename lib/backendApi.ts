@@ -1,7 +1,8 @@
 // lib/backendApi.ts
 
-export const BACKEND_URL =
+const rawBackendUrl =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+export const BACKEND_URL = rawBackendUrl.replace(/\/+$/, "");
 
 export interface BackendHealthResponse {
   isOnline: boolean;
