@@ -2,24 +2,21 @@
 
 import React, { useState, memo } from "react";
 import Image from "next/image";
-import { Terminal, Menu, X, ChevronRight, Wifi, WifiOff, Activity } from "lucide-react";
+import { Menu, X, ChevronRight } from "lucide-react";
 import { ToolId } from "@/types/tools";
 import { TOOLS_CONFIG } from "@/data/tools";
-import { useBackendStatus } from "@/context/BackendStatusContext";
 
 interface NavbarProps {
   activeTool: ToolId | null;
   onSelectTool: (id: ToolId | null) => void;
-  onOpenBackendModal: () => void;
+  onOpenBackendModal?: () => void;
 }
 
 function NavbarComponent({
   activeTool,
   onSelectTool,
-  onOpenBackendModal,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { isOnline, latencyMs } = useBackendStatus();
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 border-b border-zinc-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-md shrink-0">
@@ -76,59 +73,10 @@ function NavbarComponent({
             </nav>
           </div>
 
-          {/* RIGHT: Company Logo (TFRENZY) & Python Backend status */}
+          {/* RIGHT: Logo Emblem & Mobile menu button */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-            {/* Live Python Backend Status Indicator */}
-            <button
-              onClick={onOpenBackendModal}
-              className={`hidden sm:inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer group shadow-2xs shrink-0 border ${
-                isOnline === true
-                  ? "bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 border-emerald-300"
-                  : isOnline === false
-                  ? "bg-amber-50 hover:bg-amber-100/90 text-amber-900 border-amber-300"
-                  : "bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200"
-              }`}
-              title={
-                isOnline === true
-                  ? `Python Backend Online on port 8000 (${latencyMs}ms). Click for details.`
-                  : "Python Backend Offline (Demo Mode). Click for start instructions."
-              }
-            >
-              {isOnline === true ? (
-                <>
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
-                  </span>
-                  <Wifi className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="font-semibold text-emerald-900">Python Suite Online</span>
-                  {latencyMs !== null && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-200/80 text-emerald-800 rounded font-mono font-medium">
-                      {latencyMs}ms
-                    </span>
-                  )}
-                </>
-              ) : isOnline === false ? (
-                <>
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                  </span>
-                  <WifiOff className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span className="font-semibold text-amber-900">Suite Offline (Demo Mode)</span>
-                </>
-              ) : (
-                <>
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-zinc-400 animate-pulse"></span>
-                  </span>
-                  <Activity className="w-3.5 h-3.5 text-zinc-500 animate-spin shrink-0" />
-                  <span className="font-medium text-zinc-700">Connecting Suite...</span>
-                </>
-              )}
-            </button>
-
             {/* Clean Emblem Icon on Right Side */}
-            <div className="flex items-center pl-3 sm:pl-4 border-l border-zinc-200 shrink-0">
+            <div className="flex items-center shrink-0">
               <div
                 onClick={() => onSelectTool(null)}
                 className="cursor-pointer flex items-center transition-opacity hover:opacity-90 select-none"
@@ -191,51 +139,6 @@ function NavbarComponent({
                 <ChevronRight className="w-4 h-4 text-zinc-400" />
               </button>
             ))}
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-zinc-100 flex flex-col gap-2">
-            <button
-              onClick={() => {
-                onOpenBackendModal();
-                setMobileMenuOpen(false);
-              }}
-              className={`flex items-center justify-between w-full py-2.5 px-3 text-xs font-semibold rounded-lg cursor-pointer border ${
-                isOnline === true
-                  ? "bg-emerald-50 text-emerald-900 border-emerald-300"
-                  : isOnline === false
-                  ? "bg-amber-50 text-amber-900 border-amber-300"
-                  : "bg-zinc-50 text-zinc-700 border-zinc-200"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {isOnline === true ? (
-                  <>
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
-                    </span>
-                    <Wifi className="w-4 h-4 text-emerald-600" />
-                    <span>Python Suite Online</span>
-                  </>
-                ) : isOnline === false ? (
-                  <>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                    <WifiOff className="w-4 h-4 text-amber-600" />
-                    <span>Python Suite Offline (Demo Mode)</span>
-                  </>
-                ) : (
-                  <>
-                    <Activity className="w-4 h-4 text-zinc-500 animate-spin" />
-                    <span>Connecting Backend Suite...</span>
-                  </>
-                )}
-              </div>
-              {latencyMs !== null && isOnline && (
-                <span className="font-mono text-[10px] bg-emerald-200/80 text-emerald-800 px-1.5 py-0.5 rounded">
-                  {latencyMs}ms
-                </span>
-              )}
-            </button>
           </div>
         </div>
       )}
