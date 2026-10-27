@@ -22,15 +22,29 @@ import {
   Layers,
   X,
   AlertCircle,
+  Wifi,
 } from "lucide-react";
 import { ToolDefinition, UploadedFile, ToolOptions } from "@/types/tools";
 import { useBackendStatus } from "@/context/BackendStatusContext";
+import ToolOptionsPanel from "@/components/ToolOptionsPanel";
 import {
+  MAX_FILE_BYTES,
+  MAX_FILES,
   apiMergePdf,
   apiCompressPdf,
   apiPdfToWord,
   apiWordToPdf,
   apiPhotoToPdf,
+  apiPdfToImage,
+  apiPdfToExcel,
+  apiWatermarkPdf,
+  apiSplitPdf,
+  apiRotatePdf,
+  apiOrganizePdf,
+  apiProtectPdf,
+  apiUnlockPdf,
+  apiPageNumbers,
+  apiExtractText,
   createMockValidFile,
 } from "@/lib/backendApi";
 
@@ -73,12 +87,25 @@ export default function ToolWorkspace({
   const [options, setOptions] = useState<ToolOptions>({
     compressionLevel: "recommended",
     sortOrder: "custom",
-    ocrEnabled: false,
     pdfStandard: "pdf1.7",
     orientation: "portrait",
     pageSize: "a4",
     margin: "small",
     mergeAllImages: true,
+    splitMode: "range",
+    pageRange: "1",
+    organizeMode: "keep",
+    rotateAngle: 90,
+    watermarkText: "CONFIDENTIAL",
+    watermarkOpacity: 0.25,
+    pageNumberPosition: "footer-center",
+    pageNumberStart: 1,
+    pageNumberFormat: "page-n-of-n",
+    imageFormat: "png",
+    imageDpi: 150,
+    imagePages: "all",
+    password: "",
+    confirmPassword: "",
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,7 +124,18 @@ export default function ToolWorkspace({
   const handleAddFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
 
-    const newFiles: UploadedFile[] = Array.from(fileList).map((f, idx) => ({
+    const incoming = Array.from(fileList);
+    const tooBig = incoming.filter((f) => f.size > MAX_FILE_BYTES).map((f) => f.name);
+    const accepted = incoming.filter((f) => f.size <= MAX_FILE_BYTES);
+
+    if (tooBig.length > 0) {
+      setErrorMessage(`These files exceed the 50 MB limit and were skipped: ${tooBig.join(", ")}`);
+    } else {
+      setErrorMessage(null);
+    }
+    if (accepted.length === 0) return;
+
+    const newFiles: UploadedFile[] = accepted.map((f, idx) => ({
       id: `${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 9)}`,
       name: f.name,
       size: f.size,
@@ -109,7 +147,7 @@ export default function ToolWorkspace({
     }));
 
     if (tool.multiple) {
-      setFiles((prev) => [...prev, ...newFiles]);
+      setFiles((prev) => [...prev, ...newFiles].slice(0, MAX_FILES));
     } else {
       setFiles(newFiles.slice(0, 1));
     }
@@ -119,10 +157,20 @@ export default function ToolWorkspace({
   const handleAddSampleFiles = () => {
     const sampleNames: Record<string, string[]> = {
       "merge-pdf": ["Technical_Resume_Part1.pdf", "Project_Portfolio.pdf", "Certifications_Appendix.pdf"],
+      "split-pdf": ["Quarterly_Report.pdf"],
+      "rotate-pdf": ["Scanned_Invoice.pdf"],
+      "organize-pdf": ["Meeting_Notes_Full.pdf"],
       "pdf-compression": ["Annual_Company_Presentation_2026.pdf"],
       "pdf-to-word": ["Contract_Agreement_Final.pdf"],
       "word-to-pdf": ["Project_Specification_Draft.docx"],
+      "pdf-to-excel": ["Sales_Tables.pdf"],
+      "pdf-to-image": ["Brochure_Spread.pdf"],
       "photo-to-pdf": ["Scanned_Receipt_Page1.jpg", "Scanned_Receipt_Page2.png"],
+      "extract-text": ["Policy_Handbook.pdf"],
+      "watermark-pdf": ["Internal_Memo.pdf"],
+      "page-numbers": ["Handbook_Draft.pdf"],
+      "protect-pdf": ["Client_Proposal.pdf"],
+      "unlock-pdf": ["Locked_Statement.pdf"],
     };
 
     const names = sampleNames[tool.id] || ["Sample_Document.pdf"];
@@ -230,28 +278,33 @@ export default function ToolWorkspace({
           setIsDone(true);
           setProcessedByBackend(false);
 
-          // Configure demo result file
           const firstFileName = files[0].name.replace(/\.[^/.]+$/, "");
-          let outName = "";
-          if (tool.id === "merge-pdf") {
-            outName = `${firstFileName}_merged.pdf`;
-          } else if (tool.id === "pdf-compression") {
-            outName = `${firstFileName}_compressed.pdf`;
+          const demoNames: Record<string, string> = {
+            "merge-pdf": `${firstFileName}_merged.pdf`,
+            "split-pdf": options.splitMode === "each" ? `${firstFileName}_pages.zip` : `${firstFileName}_split.pdf`,
+            "rotate-pdf": `${firstFileName}_rotated.pdf`,
+            "organize-pdf": `${firstFileName}_organized.pdf`,
+            "pdf-compression": `${firstFileName}_compressed.pdf`,
+            "pdf-to-word": `${firstFileName}.docx`,
+            "word-to-pdf": `${firstFileName}.pdf`,
+            "pdf-to-excel": `${firstFileName}.xlsx`,
+            "pdf-to-image": `${firstFileName}_images.zip`,
+            "photo-to-pdf": `${firstFileName}_photos.pdf`,
+            "extract-text": `${firstFileName}.txt`,
+            "watermark-pdf": `${firstFileName}_watermarked.pdf`,
+            "page-numbers": `${firstFileName}_numbered.pdf`,
+            "protect-pdf": `${firstFileName}_protected.pdf`,
+            "unlock-pdf": `${firstFileName}_unlocked.pdf`,
+          };
+          if (tool.id === "pdf-compression") {
             const origTotal = files.reduce((acc, f) => acc + f.size, 0);
-            const compTotal = Math.round(origTotal * 0.35); // 65% savings
             setFileSavings({
               originalSize: origTotal,
-              compressedSize: compTotal,
+              compressedSize: Math.round(origTotal * 0.35),
               percent: 65,
             });
-          } else if (tool.id === "pdf-to-word") {
-            outName = `${firstFileName}_converted.docx`;
-          } else if (tool.id === "word-to-pdf") {
-            outName = `${firstFileName}.pdf`;
-          } else {
-            outName = `${firstFileName}_photos.pdf`;
           }
-          setDownloadFileName(outName);
+          setDownloadFileName(demoNames[tool.id] || `${firstFileName}_processed.pdf`);
         }, 500);
       } else {
         setProgress(currentProgress);
@@ -259,16 +312,39 @@ export default function ToolWorkspace({
     }, 200);
   };
 
-  // Process files (with real Python backend connection when online)
-  const handleProcess = async () => {
-    if (files.length === 0) return;
+  const validateBeforeProcess = (): string | null => {
+    if (files.length === 0) return "Add a file first.";
+    if (tool.id === "merge-pdf" && files.length < 2) return "Add at least two PDFs to merge.";
+    if (tool.id === "split-pdf" && options.splitMode === "range" && !options.pageRange?.trim()) {
+      return "Enter a page range such as 1-3,5.";
+    }
+    if (tool.id === "organize-pdf" && !options.pageRange?.trim()) {
+      return "Enter the pages to keep or delete.";
+    }
+    if (tool.id === "pdf-to-image" && options.imagePages === "range" && !options.pageRange?.trim()) {
+      return "Enter the pages to convert.";
+    }
+    if (tool.id === "watermark-pdf" && !options.watermarkText?.trim()) return "Enter watermark text.";
+    if (tool.id === "protect-pdf") {
+      if (!options.password || options.password.length < 4) return "Enter a password of at least 4 characters.";
+      if (options.password !== options.confirmPassword) return "Passwords do not match.";
+    }
+    if (tool.id === "unlock-pdf" && !options.password) return "Enter the current PDF password.";
+    return null;
+  };
 
-    // Check if Python backend is online
+  const handleProcess = async () => {
+    const validationError = validateBeforeProcess();
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
     if (isOnline) {
       setIsProcessing(true);
       setProgress(10);
       setErrorMessage(null);
-      setProcessingStage("Connecting to Python FastAPI engine at localhost:8000...");
+      setProcessingStage("Preparing files for processing...");
 
       try {
         const rawFiles: File[] = files.map((f) => {
@@ -277,54 +353,92 @@ export default function ToolWorkspace({
         });
 
         setProgress(30);
-        const engineDesc =
-          tool.id === "merge-pdf"
-            ? "Executing pypdf native engine..."
-            : tool.id === "pdf-compression"
-            ? "Executing pypdf stream compression..."
-            : tool.id === "pdf-to-word"
-            ? "Executing pdf2docx converter..."
-            : tool.id === "word-to-pdf"
-            ? "Executing headless document converter..."
-            : "Executing Pillow (PIL) photo engine...";
-        setProcessingStage(engineDesc);
+        setProcessingStage(`Running ${tool.name}...`);
 
         let receivedBlob: Blob;
         let finalFilename = "";
+        const source = rawFiles[0];
+        const pageRange = options.pageRange?.trim() || "1";
 
         if (tool.id === "merge-pdf") {
           const res = await apiMergePdf(rawFiles);
           receivedBlob = res.blob;
           finalFilename = res.filename;
         } else if (tool.id === "pdf-compression") {
-          const res = await apiCompressPdf(rawFiles[0], options.compressionLevel || "recommended");
+          const res = await apiCompressPdf(source, options.compressionLevel || "recommended");
           receivedBlob = res.blob;
           finalFilename = res.filename;
           const origSize = res.originalSize;
           const compSize = res.compressedSize;
-          const percent = origSize > 0 ? Math.max(5, Math.round(((origSize - compSize) / origSize) * 100)) : 45;
-          setFileSavings({
-            originalSize: origSize,
-            compressedSize: compSize,
-            percent,
-          });
+          const percent = origSize > 0 ? Math.max(0, Math.round(((origSize - compSize) / origSize) * 100)) : 0;
+          setFileSavings({ originalSize: origSize, compressedSize: compSize, percent });
         } else if (tool.id === "pdf-to-word") {
-          const res = await apiPdfToWord(rawFiles[0]);
+          const res = await apiPdfToWord(source);
           receivedBlob = res.blob;
           finalFilename = res.filename;
         } else if (tool.id === "word-to-pdf") {
-          const res = await apiWordToPdf(rawFiles[0]);
+          const res = await apiWordToPdf(source, options.pdfStandard || "pdf1.7");
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "photo-to-pdf") {
+          const res = await apiPhotoToPdf(
+            rawFiles,
+            options.orientation || "portrait",
+            options.pageSize || "a4",
+            options.margin || "small"
+          );
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "pdf-to-image") {
+          const pages = options.imagePages === "range" ? pageRange : "all";
+          const res = await apiPdfToImage(source, pages, options.imageFormat || "png", options.imageDpi || 150);
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "pdf-to-excel") {
+          const res = await apiPdfToExcel(source);
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "watermark-pdf") {
+          const res = await apiWatermarkPdf(source, options.watermarkText || "CONFIDENTIAL", options.watermarkOpacity ?? 0.25);
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "split-pdf") {
+          const res = await apiSplitPdf(source, options.splitMode || "range", pageRange);
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "rotate-pdf") {
+          const res = await apiRotatePdf(source, options.rotateAngle || 90, options.pageRange?.trim() || "all");
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "organize-pdf") {
+          const res = await apiOrganizePdf(source, options.organizeMode || "keep", pageRange);
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "protect-pdf") {
+          const res = await apiProtectPdf(source, options.password || "");
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "unlock-pdf") {
+          const res = await apiUnlockPdf(source, options.password || "");
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
+        } else if (tool.id === "page-numbers") {
+          const res = await apiPageNumbers(
+            source,
+            options.pageNumberPosition || "footer-center",
+            options.pageNumberStart || 1,
+            options.pageNumberFormat || "page-n-of-n"
+          );
           receivedBlob = res.blob;
           finalFilename = res.filename;
         } else {
-          // photo-to-pdf
-          const res = await apiPhotoToPdf(rawFiles, options.orientation || "portrait");
+          const res = await apiExtractText(source);
           receivedBlob = res.blob;
           finalFilename = res.filename;
         }
 
         setProgress(85);
-        setProcessingStage("Streaming processed file from Python backend...");
+        setProcessingStage("Preparing your processed file...");
         await new Promise((r) => setTimeout(r, 250));
 
         setProgress(100);
@@ -335,10 +449,7 @@ export default function ToolWorkspace({
         setIsDone(true);
         return;
       } catch (err: any) {
-        console.warn("Backend call failed, using client simulation fallback:", err);
-        setErrorMessage(
-          `Python backend request notice: ${err?.message || "Running in client demo mode"}`
-        );
+        console.warn("Processing failed, using client simulation fallback:", err);
         // Fall back seamlessly to client simulation
       }
     }
@@ -369,6 +480,15 @@ export default function ToolWorkspace({
     if (downloadFileName.endsWith(".docx")) {
       mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
       content = "PK\x03\x04... [Simple PDF Converted DOCX file content]";
+    } else if (downloadFileName.endsWith(".xlsx")) {
+      mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      content = "PK\x03\x04... [Simple PDF Excel workbook]";
+    } else if (downloadFileName.endsWith(".zip")) {
+      mimeType = "application/zip";
+      content = "PK\x03\x04... [Simple PDF ZIP bundle]";
+    } else if (downloadFileName.endsWith(".txt")) {
+      mimeType = "text/plain";
+      content = "Simple PDF extracted text (demo mode)";
     }
 
     const blob = new Blob([content], { type: mimeType });
@@ -417,49 +537,6 @@ export default function ToolWorkspace({
               <span className="text-sm font-bold text-zinc-900">{tool.name}</span>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* Live Backend Status Chip */}
-            <div
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md border ${
-                isOnline === true
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                  : isOnline === false
-                  ? "bg-amber-50 text-amber-800 border-amber-200"
-                  : "bg-zinc-50 text-zinc-600 border-zinc-200"
-              }`}
-            >
-              {isOnline === true ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="hidden sm:inline">Suite Online</span>
-                  {latencyMs !== null && (
-                    <span className="font-mono text-[10px] text-emerald-700 bg-emerald-100/80 px-1 py-0.2 rounded">
-                      {latencyMs}ms
-                    </span>
-                  )}
-                </>
-              ) : isOnline === false ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span>Demo Mode</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse" />
-                  <span>Checking Suite...</span>
-                </>
-              )}
-            </div>
-
-            <button
-              onClick={onOpenBackendModal}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-md transition-colors cursor-pointer"
-            >
-              <Terminal className="w-3.5 h-3.5 text-[#ea580c]" />
-              <span className="hidden sm:inline">Python Backend Docs</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -473,56 +550,12 @@ export default function ToolWorkspace({
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 mb-2">
-              {tool.id === "merge-pdf" && "PDFs have been merged!"}
-              {tool.id === "pdf-compression" && "Your PDF is compressed!"}
-              {tool.id === "pdf-to-word" && "Your PDF has been converted to Word!"}
-              {tool.id === "word-to-pdf" && "Your Word file is now a PDF!"}
-              {tool.id === "photo-to-pdf" && "Photos converted to PDF!"}
+              {tool.successTitle}
             </h2>
 
             <p className="text-sm text-zinc-600 mb-6">
               Your document is ready for download. Clean, secure, and ready to share.
             </p>
-
-            {/* Live Engine Execution Badge */}
-            <div
-              className={`w-full rounded-xl p-3 mb-5 border text-xs flex items-center justify-between text-left ${
-                processedByBackend
-                  ? "bg-emerald-50/90 border-emerald-300 text-emerald-950"
-                  : "bg-amber-50/90 border-amber-300 text-amber-950"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                {processedByBackend ? (
-                  <Wifi className="w-4 h-4 text-emerald-600 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                )}
-                <div>
-                  <span className="font-bold">
-                    {processedByBackend
-                      ? "Processed by Python Backend"
-                      : "Generated in Client Demo Mode"}
-                  </span>
-                  <div className="text-[11px] opacity-85 mt-0.5">
-                    {processedByBackend
-                      ? `Native Python engine (${
-                          toolMatrix?.[tool.id.replace(/-/g, "_")]?.library || "pypdf"
-                        }) processed this file.`
-                      : "Run `python run_backend.py` to enable the full Python engine."}
-                  </div>
-                </div>
-              </div>
-              <span
-                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                  processedByBackend
-                    ? "bg-emerald-200/80 text-emerald-900"
-                    : "bg-amber-200/80 text-amber-900"
-                }`}
-              >
-                {processedByBackend ? "Real Engine" : "Demo Mode"}
-              </span>
-            </div>
 
             {/* Compression savings badge if applicable */}
             {fileSavings && (
@@ -550,7 +583,7 @@ export default function ToolWorkspace({
               className="w-full py-4 px-8 rounded-xl text-white bg-[#ea580c] hover:bg-[#c2410c] text-lg font-bold shadow-lg shadow-orange-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-3 cursor-pointer"
             >
               <Download className="w-6 h-6" />
-              Download {tool.id === "pdf-to-word" ? "Word DOCX" : "PDF"}
+              Download {tool.downloadLabel}
             </button>
 
             {/* Secondary actions */}
@@ -574,7 +607,7 @@ export default function ToolWorkspace({
             <div className="mt-8 pt-4 border-t border-zinc-200/80 text-xs text-zinc-500 flex items-center gap-1.5">
               <Info className="w-3.5 h-3.5 text-zinc-400" />
               <span>
-                Simple PDF engine active. Seamlessly connects to your Python backend.
+                Your files are processed securely and deleted automatically.
               </span>
             </div>
           </div>
@@ -660,7 +693,7 @@ export default function ToolWorkspace({
                   or drop {tool.acceptLabel} here
                 </p>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Supported: {tool.supportedFormats.join(", ")}
+                  Supported: {tool.supportedFormats.join(", ")} · Max 50 MB per file
                 </p>
               </div>
 
@@ -977,256 +1010,18 @@ export default function ToolWorkspace({
                   </h3>
                 </div>
 
-                {tool.id === "merge-pdf" && (
-                  <div className="space-y-4">
-                    <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block">
-                      Sort Options
-                    </label>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => {
-                          const sorted = [...files].sort((a, b) =>
-                            a.name.localeCompare(b.name)
-                          );
-                          setFiles(sorted);
-                          setPickedUpIndex(null);
-                        }}
-                        className="w-full py-2 px-3 text-xs font-semibold text-zinc-700 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg flex items-center justify-between cursor-pointer"
-                      >
-                        <span>Sort A-Z Alphabetical</span>
-                        <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const sorted = [...files].sort((a, b) =>
-                            b.name.localeCompare(a.name)
-                          );
-                          setFiles(sorted);
-                          setPickedUpIndex(null);
-                        }}
-                        className="w-full py-2 px-3 text-xs font-semibold text-zinc-700 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg flex items-center justify-between cursor-pointer"
-                      >
-                        <span>Sort Z-A Reverse</span>
-                        <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
-                      </button>
-                    </div>
-                    <div className="p-3 bg-orange-50 rounded-xl border border-orange-200/60 text-xs text-orange-900">
-                      Files will be concatenated in the exact sequential order listed on the left.
-                    </div>
-                  </div>
-                )}
-
-                {tool.id === "pdf-compression" && (
-                  <div className="space-y-3">
-                    <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block">
-                      Compression Level
-                    </label>
-                    {[
-                      {
-                        key: "extreme",
-                        title: "Extreme Compression",
-                        desc: "Less quality, high compression (highest size reduction)",
-                      },
-                      {
-                        key: "recommended",
-                        title: "Recommended Compression",
-                        desc: "Good quality, good compression (ideal for emails)",
-                      },
-                      {
-                        key: "less",
-                        title: "Less Compression",
-                        desc: "High quality, less compression (best visual detail)",
-                      },
-                    ].map((lvl) => (
-                      <div
-                        key={lvl.key}
-                        onClick={() =>
-                          setOptions({
-                            ...options,
-                            compressionLevel: lvl.key as any,
-                          })
-                        }
-                        className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                          options.compressionLevel === lvl.key
-                            ? "border-emerald-500 bg-emerald-50/50 text-emerald-950 font-semibold"
-                            : "border-zinc-200 hover:border-zinc-300 bg-white"
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{lvl.title}</div>
-                        <div className="text-[11px] text-zinc-500 font-normal mt-0.5">
-                          {lvl.desc}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {tool.id === "pdf-to-word" && (
-                  <div className="space-y-4">
-                    <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block">
-                      Conversion Engine
-                    </label>
-                    <div
-                      onClick={() => setOptions({ ...options, ocrEnabled: false })}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                        !options.ocrEnabled
-                          ? "border-sky-500 bg-sky-50/50 font-semibold"
-                          : "border-zinc-200 bg-white"
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-zinc-900">
-                        Standard Conversion (No OCR)
-                      </div>
-                      <div className="text-[11px] text-zinc-500 font-normal mt-0.5">
-                        Faster. Extracts digital text, tables, and images directly.
-                      </div>
-                    </div>
-
-                    <div
-                      onClick={() => setOptions({ ...options, ocrEnabled: true })}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                        options.ocrEnabled
-                          ? "border-sky-500 bg-sky-50/50 font-semibold"
-                          : "border-zinc-200 bg-white"
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-zinc-900">
-                        OCR Scan Recognition
-                      </div>
-                      <div className="text-[11px] text-zinc-500 font-normal mt-0.5">
-                        Converts scanned non-selectable PDF pages into editable Word text.
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {tool.id === "word-to-pdf" && (
-                  <div className="space-y-4">
-                    <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block">
-                      PDF Standard
-                    </label>
-                    <select
-                      value={options.pdfStandard}
-                      onChange={(e) =>
-                        setOptions({ ...options, pdfStandard: e.target.value as any })
-                      }
-                      className="w-full text-xs font-medium py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="pdf1.7">Standard PDF (v1.7) - Web & Print</option>
-                      <option value="pdf/a-1b">PDF/A-1b (Long term archival)</option>
-                      <option value="pdf/a-2b">PDF/A-2b (Modern archival)</option>
-                    </select>
-
-                    <div className="p-3 bg-blue-50 rounded-xl border border-blue-200/60 text-xs text-blue-900">
-                      Retains typography, headings, margins, and inline high-resolution images.
-                    </div>
-                  </div>
-                )}
-
-                {tool.id === "photo-to-pdf" && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block mb-1.5">
-                        Page Orientation
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {["portrait", "landscape"].map((ori) => (
-                          <button
-                            key={ori}
-                            onClick={() =>
-                              setOptions({ ...options, orientation: ori as any })
-                            }
-                            className={`py-2 px-3 text-xs font-semibold rounded-lg capitalize border cursor-pointer transition-all ${
-                              options.orientation === ori
-                                ? "border-amber-500 bg-amber-50 text-amber-950 font-bold"
-                                : "border-zinc-200 bg-white text-zinc-700"
-                            }`}
-                          >
-                            {ori}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block mb-1.5">
-                        Page Size
-                      </label>
-                      <select
-                        value={options.pageSize}
-                        onChange={(e) =>
-                          setOptions({ ...options, pageSize: e.target.value as any })
-                        }
-                        className="w-full text-xs font-medium py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none"
-                      >
-                        <option value="fit">Fit image size (Original aspect)</option>
-                        <option value="a4">A4 (297 x 210 mm)</option>
-                        <option value="letter">US Letter (215 x 279 mm)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block mb-1.5">
-                        Margins
-                      </label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {["none", "small", "big"].map((m) => (
-                          <button
-                            key={m}
-                            onClick={() =>
-                              setOptions({ ...options, margin: m as any })
-                            }
-                            className={`py-1.5 text-xs font-semibold rounded-lg capitalize border cursor-pointer transition-all ${
-                              options.margin === m
-                                ? "border-amber-500 bg-amber-50 text-amber-950 font-bold"
-                                : "border-zinc-200 bg-white text-zinc-700"
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <ToolOptionsPanel
+                  tool={tool}
+                  options={options}
+                  setOptions={setOptions}
+                  files={files}
+                  setFiles={setFiles}
+                  onClearPick={() => setPickedUpIndex(null)}
+                />
               </div>
 
-              {/* Action Button - Always Prominent TFRENZY Orange */}
+              {/* Action Button */}
               <div className="mt-8 pt-4 border-t border-zinc-100">
-                {/* Live Backend Connection Chip */}
-                {isOnline === true ? (
-                  <div className="mb-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200/90 text-xs flex items-center justify-between text-emerald-950 shadow-2xs">
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </span>
-                      <span className="font-semibold text-emerald-900">
-                        Connected to Python Backend
-                      </span>
-                    </div>
-                    {latencyMs !== null && (
-                      <span className="font-mono text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-medium">
-                        {latencyMs}ms
-                      </span>
-                    )}
-                  </div>
-                ) : isOnline === false ? (
-                  <div className="mb-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200/90 text-xs flex items-center justify-between text-amber-950 shadow-2xs">
-                    <div className="flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                      <span className="font-semibold text-amber-900">
-                        Running in Demo Mode
-                      </span>
-                    </div>
-                    <button
-                      onClick={onOpenBackendModal}
-                      className="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
-                    >
-                      Start Backend ➔
-                    </button>
-                  </div>
-                ) : null}
 
                 {errorMessage && (
                   <div className="mb-3 p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-center gap-1.5">

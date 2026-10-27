@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Simple PDF | Online PDF Tools",
-  description: "Simple PDF. Merge PDF, Compress PDF, PDF to Word, Word to PDF, and Photo to PDF. Clean, fast, free, and secure document toolkit.",
+  description: "Simple PDF toolkit. Merge, split, rotate, compress, convert to Word or Excel, watermark, number pages, protect, and unlock PDFs.",
   icons: {
     icon: "/favicon.ico",
   },

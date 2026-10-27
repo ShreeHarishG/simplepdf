@@ -79,8 +79,8 @@ export default function Footer({
             </div>
 
             <p className="text-xs sm:text-sm text-zinc-500 max-w-sm leading-relaxed">
-              Online document tools designed with simplicity. Effortlessly merge,
-              compress, and convert your documents securely with zero limits.
+              Everyday PDF tools in one place. Merge, split, convert, stamp, number,
+              lock, and unlock — without extra clutter.
             </p>
 
             <div className="pt-2 flex items-center gap-2.5">
@@ -93,7 +93,7 @@ export default function Footer({
             <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-900 mb-3">
               Everyday PDF Tools
             </h5>
-            <ul className="space-y-2 text-xs">
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
               {TOOLS_CONFIG.map((t) => (
                 <li key={t.id}>
                   <button

@@ -1,15 +1,28 @@
 export type ToolId =
   | "merge-pdf"
+  | "split-pdf"
+  | "rotate-pdf"
+  | "organize-pdf"
   | "pdf-compression"
   | "pdf-to-word"
   | "word-to-pdf"
-  | "photo-to-pdf";
+  | "pdf-to-excel"
+  | "pdf-to-image"
+  | "photo-to-pdf"
+  | "extract-text"
+  | "watermark-pdf"
+  | "page-numbers"
+  | "protect-pdf"
+  | "unlock-pdf";
+
+export type ToolCategory = "organize" | "convert" | "optimize" | "edit" | "secure";
 
 export interface ToolDefinition {
   id: ToolId;
   name: string;
   tagline: string;
   description: string;
+  category: ToolCategory;
   color: string;
   lightBg: string;
   borderColor: string;
@@ -17,8 +30,16 @@ export interface ToolDefinition {
   accept: string;
   acceptLabel: string;
   actionButtonText: string;
+  successTitle: string;
+  downloadLabel: string;
   multiple: boolean;
   supportedFormats: string[];
+}
+
+export interface ToolGroup {
+  id: ToolCategory;
+  title: string;
+  description: string;
 }
 
 export interface UploadedFile {
@@ -33,18 +54,26 @@ export interface UploadedFile {
 }
 
 export interface ToolOptions {
-  // Compress PDF options
   compressionLevel?: "extreme" | "recommended" | "less";
-  // Merge PDF options
   sortOrder?: "custom" | "az" | "za";
-  // PDF to Word options
-  ocrEnabled?: boolean;
-  ocrLanguage?: string;
-  // Word to PDF options
   pdfStandard?: "pdf1.7" | "pdf/a-1b" | "pdf/a-2b";
-  // Photo to PDF options
   orientation?: "portrait" | "landscape";
   pageSize?: "fit" | "a4" | "letter";
   margin?: "none" | "small" | "big";
   mergeAllImages?: boolean;
+  splitMode?: "range" | "each";
+  pageRange?: string;
+  organizeMode?: "keep" | "delete";
+  rotateAngle?: 90 | 180 | 270;
+  watermarkText?: string;
+  watermarkOpacity?: number;
+  pageNumberPosition?: "header-left" | "header-center" | "header-right" | "footer-left" | "footer-center" | "footer-right";
+  pageNumberStart?: number;
+  pageNumberFormat?: "number" | "page-n" | "page-n-of-n";
+  imageFormat?: "png" | "jpg";
+  imageDpi?: 72 | 150 | 300;
+  imagePages?: "all" | "range";
+  password?: string;
+  confirmPassword?: string;
+  ocrEnabled?: boolean;
 }

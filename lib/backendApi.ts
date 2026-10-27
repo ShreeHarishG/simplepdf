@@ -1,8 +1,9 @@
-// lib/backendApi.ts
-
 const rawBackendUrl =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 export const BACKEND_URL = rawBackendUrl.replace(/\/+$/, "");
+
+export const MAX_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_FILES = 30;
 
 export interface BackendHealthResponse {
   isOnline: boolean;
@@ -13,9 +14,36 @@ export interface BackendHealthResponse {
   error?: string;
 }
 
-/**
- * Pings the Python FastAPI backend to determine live connection status and latency
- */
+export interface FileResult {
+  blob: Blob;
+  filename: string;
+}
+
+async function postForm(path: string, formData: FormData, fallbackName: string): Promise<FileResult> {
+  const response = await fetch(`${BACKEND_URL}${path}`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const raw = await response.text();
+    let detail = response.statusText;
+    if (raw) {
+      try {
+        const data = JSON.parse(raw);
+        detail = typeof data.detail === "string" ? data.detail : raw;
+      } catch {
+        detail = raw;
+      }
+    }
+    throw new Error(detail || "Backend request failed");
+  }
+
+  const blob = await response.blob();
+  const filename = extractFilenameFromHeader(response) || fallbackName;
+  return { blob, filename };
+}
+
 export async function checkBackendHealth(): Promise<BackendHealthResponse> {
   const startTime = performance.now();
   const controller = new AbortController();
@@ -24,9 +52,7 @@ export async function checkBackendHealth(): Promise<BackendHealthResponse> {
   try {
     const response = await fetch(`${BACKEND_URL}/`, {
       method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
+      headers: { Accept: "application/json" },
       signal: controller.signal,
       cache: "no-store",
     });
@@ -43,146 +69,152 @@ export async function checkBackendHealth(): Promise<BackendHealthResponse> {
         status: data.status,
         toolMatrix: data.tool_matrix,
       };
-    } else {
-      return {
-        isOnline: false,
-        latencyMs,
-        error: `HTTP ${response.status} ${response.statusText}`,
-      };
     }
-  } catch (err: any) {
+
+    return {
+      isOnline: false,
+      latencyMs,
+      error: `HTTP ${response.status} ${response.statusText}`,
+    };
+  } catch (err: unknown) {
     clearTimeout(timeoutId);
+    const error = err as { name?: string; message?: string };
     return {
       isOnline: false,
       latencyMs: 0,
-      error: err.name === "AbortError" ? "Connection timed out" : err.message || "Backend unreachable",
+      error: error.name === "AbortError" ? "Connection timed out" : error.message || "Backend unreachable",
     };
   }
 }
 
-/**
- * Merge multiple PDF files via backend: POST /api/merge-pdf
- */
-export async function apiMergePdf(files: File[]): Promise<{ blob: Blob; filename: string }> {
+export async function apiMergePdf(files: File[]): Promise<FileResult> {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
-
-  const response = await fetch(`${BACKEND_URL}/api/merge-pdf`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Backend Merge failed: ${errText || response.statusText}`);
-  }
-
-  const blob = await response.blob();
-  const filename = extractFilenameFromHeader(response) || "simplepdf_merged.pdf";
-  return { blob, filename };
+  return postForm("/api/merge-pdf", formData, "simplepdf_merged.pdf");
 }
 
-/**
- * Compress PDF via backend: POST /api/compress-pdf
- */
 export async function apiCompressPdf(
   file: File,
   level: string = "recommended"
-): Promise<{ blob: Blob; filename: string; originalSize: number; compressedSize: number }> {
+): Promise<FileResult & { originalSize: number; compressedSize: number }> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("level", level);
-
-  const response = await fetch(`${BACKEND_URL}/api/compress-pdf`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Backend Compress failed: ${errText || response.statusText}`);
-  }
-
-  const blob = await response.blob();
-  const filename = extractFilenameFromHeader(response) || `compressed_${file.name}`;
-  return {
-    blob,
-    filename,
-    originalSize: file.size,
-    compressedSize: blob.size,
-  };
+  const result = await postForm("/api/compress-pdf", formData, `compressed_${file.name}`);
+  return { ...result, originalSize: file.size, compressedSize: result.blob.size };
 }
 
-/**
- * Convert PDF to Word via backend: POST /api/pdf-to-word
- */
-export async function apiPdfToWord(file: File): Promise<{ blob: Blob; filename: string }> {
+export async function apiPdfToWord(file: File): Promise<FileResult> {
   const formData = new FormData();
   formData.append("file", file);
-
-  const response = await fetch(`${BACKEND_URL}/api/pdf-to-word`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Backend PDF-to-Word failed: ${errText || response.statusText}`);
-  }
-
-  const blob = await response.blob();
-  const baseName = file.name.replace(/\.[^/.]+$/, "");
-  const filename = extractFilenameFromHeader(response) || `${baseName}.docx`;
-  return { blob, filename };
+  return postForm("/api/pdf-to-word", formData, `${file.name.replace(/\.[^/.]+$/, "")}.docx`);
 }
 
-/**
- * Convert Word to PDF via backend: POST /api/word-to-pdf
- */
-export async function apiWordToPdf(file: File): Promise<{ blob: Blob; filename: string }> {
+export async function apiWordToPdf(file: File, pdfStandard: string = "pdf1.7"): Promise<FileResult> {
   const formData = new FormData();
   formData.append("file", file);
-
-  const response = await fetch(`${BACKEND_URL}/api/word-to-pdf`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Backend Word-to-PDF failed: ${errText || response.statusText}`);
-  }
-
-  const blob = await response.blob();
-  const baseName = file.name.replace(/\.[^/.]+$/, "");
-  const filename = extractFilenameFromHeader(response) || `${baseName}.pdf`;
-  return { blob, filename };
+  formData.append("pdf_standard", pdfStandard);
+  return postForm("/api/word-to-pdf", formData, `${file.name.replace(/\.[^/.]+$/, "")}.pdf`);
 }
 
-/**
- * Convert Photo to PDF via backend: POST /api/photo-to-pdf
- */
 export async function apiPhotoToPdf(
   files: File[],
-  orientation: string = "portrait"
-): Promise<{ blob: Blob; filename: string }> {
+  orientation: string = "portrait",
+  pageSize: string = "a4",
+  margin: string = "small"
+): Promise<FileResult> {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
   formData.append("orientation", orientation);
+  formData.append("page_size", pageSize);
+  formData.append("margin", margin);
+  return postForm("/api/photo-to-pdf", formData, "simplepdf_photos.pdf");
+}
 
-  const response = await fetch(`${BACKEND_URL}/api/photo-to-pdf`, {
-    method: "POST",
-    body: formData,
-  });
+export async function apiPdfToImage(
+  file: File,
+  pages: string = "all",
+  imageFormat: string = "png",
+  dpi: number = 150
+): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("pages", pages);
+  formData.append("image_format", imageFormat);
+  formData.append("dpi", String(dpi));
+  return postForm("/api/pdf-to-image", formData, "simplepdf_pages.zip");
+}
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Backend Photo-to-PDF failed: ${errText || response.statusText}`);
-  }
+export async function apiPdfToExcel(file: File): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return postForm("/api/pdf-to-excel", formData, `${file.name.replace(/\.[^/.]+$/, "")}.xlsx`);
+}
 
-  const blob = await response.blob();
-  const filename = extractFilenameFromHeader(response) || "simplepdf_photos.pdf";
-  return { blob, filename };
+export async function apiWatermarkPdf(file: File, watermarkText: string, opacity: number): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("watermark_text", watermarkText);
+  formData.append("opacity", String(opacity));
+  return postForm("/api/watermark-pdf", formData, "watermarked.pdf");
+}
+
+export async function apiSplitPdf(file: File, mode: string, pages: string): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("mode", mode);
+  formData.append("pages", pages);
+  return postForm("/api/split-pdf", formData, "simplepdf_split.pdf");
+}
+
+export async function apiRotatePdf(file: File, angle: number, pages: string): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("angle", String(angle));
+  formData.append("pages", pages);
+  return postForm("/api/rotate-pdf", formData, "simplepdf_rotated.pdf");
+}
+
+export async function apiOrganizePdf(file: File, mode: string, pages: string): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("mode", mode);
+  formData.append("pages", pages);
+  return postForm("/api/organize-pdf", formData, "simplepdf_organized.pdf");
+}
+
+export async function apiProtectPdf(file: File, password: string): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("password", password);
+  return postForm("/api/protect-pdf", formData, "simplepdf_protected.pdf");
+}
+
+export async function apiUnlockPdf(file: File, password: string): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("password", password);
+  return postForm("/api/unlock-pdf", formData, "simplepdf_unlocked.pdf");
+}
+
+export async function apiPageNumbers(
+  file: File,
+  position: string,
+  start: number,
+  numberFormat: string
+): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("position", position);
+  formData.append("start", String(start));
+  formData.append("number_format", numberFormat);
+  return postForm("/api/page-numbers", formData, "simplepdf_numbered.pdf");
+}
+
+export async function apiExtractText(file: File): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return postForm("/api/extract-text", formData, `${file.name.replace(/\.[^/.]+$/, "")}.txt`);
 }
 
 function extractFilenameFromHeader(response: Response): string | null {
@@ -192,11 +224,7 @@ function extractFilenameFromHeader(response: Response): string | null {
   return match ? match[1] : null;
 }
 
-/**
- * Generates a minimal valid file for sample testing if real file is not available
- */
 export function createMockValidFile(name: string, type: string): File {
-  // Minimal valid PDF byte stream (single empty page)
   if (name.endsWith(".pdf") || type.includes("pdf")) {
     const minimalPdf = `%PDF-1.4
 1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
@@ -215,18 +243,16 @@ startxref
     return new File([minimalPdf], name, { type: "application/pdf" });
   }
 
-  // Minimal 1x1 PNG for image testing
   if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || type.includes("image")) {
-    const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const pngBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     const byteCharacters = atob(pngBase64);
     const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
       byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new File([byteArray], name, { type: "image/png" });
+    return new File([new Uint8Array(byteNumbers)], name, { type: "image/png" });
   }
 
-  // Fallback text/docx
   return new File(["Simple PDF Document Content"], name, { type });
 }
