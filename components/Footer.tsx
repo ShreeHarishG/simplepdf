@@ -2,18 +2,17 @@
 
 import React from "react";
 import Image from "next/image";
-import { ShieldCheck, Zap, Lock, Terminal, Sparkles } from "lucide-react";
+import { ShieldCheck, Zap, Lock, Sparkles } from "lucide-react";
 import { ToolId } from "@/types/tools";
 import { TOOLS_CONFIG } from "@/data/tools";
 
 interface FooterProps {
   onSelectTool: (id: ToolId) => void;
-  onOpenBackendModal: () => void;
+  onOpenBackendModal?: () => void;
 }
 
 export default function Footer({
   onSelectTool,
-  onOpenBackendModal,
 }: FooterProps) {
   return (
     <footer className="bg-white border-t border-zinc-200/80 mt-auto">
@@ -60,25 +59,18 @@ export default function Footer({
 
       {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Col 1: Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full fill-none">
-                  <polygon
-                    points="50,4 90,26 90,74 50,96 10,74 10,26"
-                    fill="#ea580c"
-                  />
-                  <polygon
-                    points="50,20 76,34 76,66 50,80 24,66 24,34"
-                    fill="#ffffff"
-                  />
-                  <polygon
-                    points="50,32 66,41 66,59 50,68 34,59 34,41"
-                    fill="#ea580c"
-                  />
-                </svg>
+              <div className="relative w-7 h-7 shrink-0 flex items-center justify-center">
+                <Image
+                  src="/logo-emblem.png"
+                  alt="Simple PDF Emblem"
+                  fill
+                  sizes="28px"
+                  className="object-contain"
+                />
               </div>
               <div className="text-2xl font-extrabold tracking-tight">
                 <span className="text-zinc-900">Simple</span>
@@ -91,25 +83,15 @@ export default function Footer({
               compress, and convert your documents securely with zero limits.
             </p>
 
-            {/* Emblem in Footer */}
             <div className="pt-2 flex items-center gap-2.5">
-              <div className="relative h-7 w-7">
-                <Image
-                  src="/logo-emblem.png"
-                  alt="Simple PDF Emblem"
-                  fill
-                  sizes="28px"
-                  className="object-contain"
-                />
-              </div>
-              <span className="text-xs text-zinc-600 font-semibold">Simple PDF Toolkit</span>
+              <span className="text-xs text-zinc-500 font-medium">Simple PDF Toolkit — Reliable document processing</span>
             </div>
           </div>
 
-          {/* Col 2: Task For Today Tools */}
+          {/* Col 2: Tools */}
           <div>
             <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-900 mb-3">
-              Task for Today Tools
+              Everyday PDF Tools
             </h5>
             <ul className="space-y-2 text-xs">
               {TOOLS_CONFIG.map((t) => (
@@ -124,31 +106,12 @@ export default function Footer({
               ))}
             </ul>
           </div>
-
-          {/* Col 3: Python Backend */}
-          <div>
-            <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-900 mb-3">
-              Python Backend Engine
-            </h5>
-            <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
-              FastAPI backend integration specification and ready endpoints.
-            </p>
-            <button
-              onClick={onOpenBackendModal}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-orange-950 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors cursor-pointer"
-            >
-              <Terminal className="w-3.5 h-3.5 text-[#ea580c]" />
-              View Python Spec
-            </button>
-          </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-10 pt-6 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-400 gap-3">
+        <div className="mt-10 pt-6 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-center text-xs text-zinc-400 gap-3">
           <p>© 2026 Simple PDF. All rights reserved.</p>
-          <p className="flex items-center gap-1">
-            Developed with <Sparkles className="w-3.5 h-3.5 text-[#ea580c]" /> for fast, secure document processing
-          </p>
+    
         </div>
       </div>
     </footer>

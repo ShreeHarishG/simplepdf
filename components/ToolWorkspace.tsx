@@ -17,13 +17,10 @@ import {
   MoveUp,
   MoveDown,
   Info,
-  Terminal,
   GripVertical,
   Hand,
   Layers,
   X,
-  Wifi,
-  WifiOff,
   AlertCircle,
 } from "lucide-react";
 import { ToolDefinition, UploadedFile, ToolOptions } from "@/types/tools";
@@ -40,13 +37,12 @@ import {
 interface ToolWorkspaceProps {
   tool: ToolDefinition;
   onBack: () => void;
-  onOpenBackendModal: () => void;
+  onOpenBackendModal?: () => void;
 }
 
 export default function ToolWorkspace({
   tool,
   onBack,
-  onOpenBackendModal,
 }: ToolWorkspaceProps) {
   const { isOnline, latencyMs, toolMatrix } = useBackendStatus();
   const [files, setFiles] = useState<UploadedFile[]>([]);
