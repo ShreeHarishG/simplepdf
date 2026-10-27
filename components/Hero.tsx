@@ -11,9 +11,9 @@ interface HeroProps {
 
 const QUICK_TOOLS: ToolId[] = [
   "merge-pdf",
-  "split-pdf",
-  "pdf-compression",
-  "pdf-to-excel",
+  "organize-pdf",
+  "excel-to-pdf",
+  "ppt-to-pdf",
   "watermark-pdf",
   "protect-pdf",
 ];
@@ -37,8 +37,8 @@ export default function Hero({ onSelectTool }: HeroProps) {
       </h1>
 
       <p className="mt-4 sm:mt-5 text-base sm:text-lg text-zinc-600 max-w-2xl mx-auto leading-relaxed">
-        Merge, split, rotate, convert, watermark, number, lock, and unlock —
-        without extra clutter. OCR for scans comes later.
+        Merge, split, visually organize pages, convert Office files, add a text or
+        logo watermark, number, lock, and unlock — without extra clutter.
       </p>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">

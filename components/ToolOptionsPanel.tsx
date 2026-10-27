@@ -128,21 +128,16 @@ export default function ToolOptionsPanel({
     );
   }
 
-  if (tool.id === "word-to-pdf") {
+  if (tool.id === "word-to-pdf" || tool.id === "excel-to-pdf" || tool.id === "ppt-to-pdf") {
+    const label =
+      tool.id === "excel-to-pdf"
+        ? "We turn your spreadsheet into a regular PDF you can share."
+        : tool.id === "ppt-to-pdf"
+        ? "We turn your slides into a regular PDF you can share."
+        : "We turn your Word file into a regular PDF you can share.";
     return (
-      <div className="space-y-4">
-        <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block">PDF Standard</label>
-        <select
-          value={options.pdfStandard}
-          onChange={(e) =>
-            setOptions({ ...options, pdfStandard: e.target.value as ToolOptions["pdfStandard"] })
-          }
-          className="w-full text-xs font-medium py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          <option value="pdf1.7">Standard PDF (v1.7) — web and print</option>
-          <option value="pdf/a-1b">PDF/A-1b — long-term archival</option>
-          <option value="pdf/a-2b">PDF/A-2b — modern archival</option>
-        </select>
+      <div className="p-3 bg-blue-50 rounded-xl border border-blue-200/60 text-xs text-blue-900">
+        {label} No extra settings needed.
       </div>
     );
   }
@@ -200,76 +195,29 @@ export default function ToolOptionsPanel({
 
   if (tool.id === "split-pdf") {
     return (
-      <div className="space-y-4">
-        <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block">Split Mode</label>
-        <div className="grid grid-cols-2 gap-2">
-          <ChoiceButton active={options.splitMode === "range"} onClick={() => setOptions({ ...options, splitMode: "range" })}>
-            Page range
-          </ChoiceButton>
-          <ChoiceButton active={options.splitMode === "each"} onClick={() => setOptions({ ...options, splitMode: "each" })}>
-            Every page
-          </ChoiceButton>
-        </div>
-        {options.splitMode === "range" ? (
-          <input
-            type="text"
-            value={options.pageRange}
-            onChange={(e) => setOptions({ ...options, pageRange: e.target.value })}
-            placeholder="e.g. 1-3, 5, 8-10"
-            className="w-full text-xs py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400"
-          />
-        ) : (
-          <div className="p-3 bg-teal-50 rounded-xl border border-teal-200/60 text-xs text-teal-900">
-            Each page becomes its own PDF, downloaded together as a ZIP.
-          </div>
-        )}
+      <div className="p-3 bg-teal-50 rounded-xl border border-teal-200/60 text-xs text-teal-900">
+        Each selected page becomes its own PDF. You download them together as a ZIP file. Unclick a page to leave it out.
       </div>
     );
   }
 
   if (tool.id === "rotate-pdf") {
     return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-2">
-          {([90, 180, 270] as const).map((angle) => (
-            <ChoiceButton
-              key={angle}
-              active={options.rotateAngle === angle}
-              onClick={() => setOptions({ ...options, rotateAngle: angle })}
-            >
-              {angle}°
-            </ChoiceButton>
-          ))}
-        </div>
-        <input
-          type="text"
-          value={options.pageRange}
-          onChange={(e) => setOptions({ ...options, pageRange: e.target.value })}
-          placeholder="all or 1,3,5-7"
-          className="w-full text-xs py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400"
-        />
+      <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200/70 text-xs text-indigo-950">
+        Use the Left and Right buttons on each page preview. What you see is what gets saved.
       </div>
     );
   }
 
   if (tool.id === "organize-pdf") {
     return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-2">
-          <ChoiceButton active={options.organizeMode === "keep"} onClick={() => setOptions({ ...options, organizeMode: "keep" })}>
-            Keep pages
-          </ChoiceButton>
-          <ChoiceButton active={options.organizeMode === "delete"} onClick={() => setOptions({ ...options, organizeMode: "delete" })}>
-            Delete pages
-          </ChoiceButton>
+      <div className="space-y-3">
+        <div className="p-3 bg-violet-50 rounded-xl border border-violet-200/70 text-xs text-violet-950">
+          Drag or pick up pages on the left to reorder them. Rotate or delete individual pages, then save.
         </div>
-        <input
-          type="text"
-          value={options.pageRange}
-          onChange={(e) => setOptions({ ...options, pageRange: e.target.value })}
-          placeholder="e.g. 2, 4-6"
-          className="w-full text-xs py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400"
-        />
+        <p className="text-[11px] text-zinc-500">
+          The saved PDF keeps only the pages still on the grid, in the order you arranged.
+        </p>
       </div>
     );
   }
@@ -331,14 +279,84 @@ export default function ToolOptionsPanel({
   if (tool.id === "watermark-pdf") {
     return (
       <div className="space-y-4">
-        <input
-          type="text"
-          maxLength={80}
-          value={options.watermarkText}
-          onChange={(e) => setOptions({ ...options, watermarkText: e.target.value })}
-          placeholder="CONFIDENTIAL"
-          className="w-full text-xs py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400"
-        />
+        <div className="grid grid-cols-2 gap-2">
+          <ChoiceButton
+            active={options.watermarkMode !== "logo"}
+            onClick={() => setOptions({ ...options, watermarkMode: "text" })}
+          >
+            Text
+          </ChoiceButton>
+          <ChoiceButton
+            active={options.watermarkMode === "logo"}
+            onClick={() => setOptions({ ...options, watermarkMode: "logo" })}
+          >
+            Logo
+          </ChoiceButton>
+        </div>
+        {options.watermarkMode === "logo" ? (
+          <div>
+            <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block mb-1.5">
+              Logo image
+            </label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+              onChange={(e) =>
+                setOptions({ ...options, watermarkLogoFile: e.target.files?.[0] || null })
+              }
+              className="w-full text-xs file:mr-2 file:py-1.5 file:px-2.5 file:rounded-md file:border-0 file:bg-orange-50 file:text-[#ea580c] file:font-semibold"
+            />
+            {options.watermarkLogoFile && (
+              <p className="mt-1.5 text-[11px] text-zinc-500 truncate">{options.watermarkLogoFile.name}</p>
+            )}
+          </div>
+        ) : (
+          <input
+            type="text"
+            maxLength={80}
+            value={options.watermarkText}
+            onChange={(e) => setOptions({ ...options, watermarkText: e.target.value })}
+            placeholder="CONFIDENTIAL"
+            className="w-full text-xs py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400"
+          />
+        )}
+        <div>
+          <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block mb-1.5">
+            Position
+          </label>
+          <select
+            value={options.watermarkPosition || "center"}
+            onChange={(e) =>
+              setOptions({
+                ...options,
+                watermarkPosition: e.target.value as ToolOptions["watermarkPosition"],
+              })
+            }
+            className="w-full text-xs font-medium py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-lg"
+          >
+            <option value="center">Center</option>
+            <option value="top-left">Top left</option>
+            <option value="top-right">Top right</option>
+            <option value="bottom-left">Bottom left</option>
+            <option value="bottom-right">Bottom right</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wide block mb-1.5">
+            Rotation
+          </label>
+          <div className="grid grid-cols-4 gap-1.5">
+            {([0, 45, 90, 315] as const).map((angle) => (
+              <ChoiceButton
+                key={angle}
+                active={(options.watermarkRotation ?? 45) === angle}
+                onClick={() => setOptions({ ...options, watermarkRotation: angle })}
+              >
+                {angle}°
+              </ChoiceButton>
+            ))}
+          </div>
+        </div>
         <label className="text-xs font-semibold text-zinc-700 block">
           Opacity ({Math.round((options.watermarkOpacity || 0.25) * 100)}%)
         </label>
@@ -351,6 +369,22 @@ export default function ToolOptionsPanel({
           onChange={(e) => setOptions({ ...options, watermarkOpacity: Number(e.target.value) })}
           className="w-full accent-[#ea580c]"
         />
+        {options.watermarkMode === "logo" && (
+          <>
+            <label className="text-xs font-semibold text-zinc-700 block">
+              Logo size ({Math.round((options.watermarkScale || 0.28) * 100)}%)
+            </label>
+            <input
+              type="range"
+              min={0.1}
+              max={0.55}
+              step={0.05}
+              value={options.watermarkScale || 0.28}
+              onChange={(e) => setOptions({ ...options, watermarkScale: Number(e.target.value) })}
+              className="w-full accent-[#ea580c]"
+            />
+          </>
+        )}
       </div>
     );
   }

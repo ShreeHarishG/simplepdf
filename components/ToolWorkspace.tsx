@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   ArrowLeft,
   Upload,
@@ -24,9 +24,11 @@ import {
   AlertCircle,
   Wifi,
 } from "lucide-react";
-import { ToolDefinition, UploadedFile, ToolOptions } from "@/types/tools";
+import { ToolDefinition, UploadedFile, ToolOptions, PdfPageItem } from "@/types/tools";
 import { useBackendStatus } from "@/context/BackendStatusContext";
 import ToolOptionsPanel from "@/components/ToolOptionsPanel";
+import PagePreviewGrid from "@/components/PagePreviewGrid";
+import { renderPdfPages } from "@/lib/pdfPreview";
 import {
   MAX_FILE_BYTES,
   MAX_FILES,
@@ -34,19 +36,43 @@ import {
   apiCompressPdf,
   apiPdfToWord,
   apiWordToPdf,
+  apiOfficeToPdf,
+  apiPdfThumbnails,
   apiPhotoToPdf,
   apiPdfToImage,
   apiPdfToExcel,
   apiWatermarkPdf,
   apiSplitPdf,
-  apiRotatePdf,
   apiOrganizePdf,
   apiProtectPdf,
   apiUnlockPdf,
   apiPageNumbers,
   apiExtractText,
-  createMockValidFile,
 } from "@/lib/backendApi";
+
+const PAGE_TOOLS = new Set(["organize-pdf", "split-pdf", "rotate-pdf"]);
+
+const OFFICE_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const OFFICE_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const OFFICE_PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+function samplePngFile(name: string): File {
+  const bytes = Uint8Array.from(
+    atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="),
+    (char) => char.charCodeAt(0)
+  );
+  return new File([bytes], name, { type: "image/png" });
+}
+
+async function loadSampleFile(url: string, name: string, type: string): Promise<File> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Could not load the sample file.");
+  return new File([await response.blob()], name, { type });
+}
+
+function nextAngle(current: PdfPageItem["rotate"], delta: 90 | -90): PdfPageItem["rotate"] {
+  return ((((current + delta) % 360) + 360) % 360) as PdfPageItem["rotate"];
+}
 
 interface ToolWorkspaceProps {
   tool: ToolDefinition;
@@ -74,6 +100,10 @@ export default function ToolWorkspace({
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [processedByBackend, setProcessedByBackend] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pages, setPages] = useState<PdfPageItem[]>([]);
+  const [pagesLoading, setPagesLoading] = useState(false);
+  const [pagesError, setPagesError] = useState<string | null>(null);
+  const [pagesTruncated, setPagesTruncated] = useState(false);
 
   // Pick & Drop States
   // 1. Click-to-pick up mode (explicit UI level pick up and drop)
@@ -92,12 +122,17 @@ export default function ToolWorkspace({
     pageSize: "a4",
     margin: "small",
     mergeAllImages: true,
-    splitMode: "range",
-    pageRange: "1",
+    splitMode: "each",
+    pageRange: "all",
     organizeMode: "keep",
     rotateAngle: 90,
     watermarkText: "CONFIDENTIAL",
     watermarkOpacity: 0.25,
+    watermarkMode: "text",
+    watermarkPosition: "center",
+    watermarkRotation: 45,
+    watermarkScale: 0.28,
+    watermarkLogoFile: null,
     pageNumberPosition: "footer-center",
     pageNumberStart: 1,
     pageNumberFormat: "page-n-of-n",
@@ -109,6 +144,84 @@ export default function ToolWorkspace({
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sourceFileId = files[0]?.id;
+
+  useEffect(() => {
+    setFiles([]);
+    setIsDragging(false);
+    setIsProcessing(false);
+    setProgress(0);
+    setIsDone(false);
+    setDownloadFileName("");
+    setFileSavings(null);
+    setResultBlob(null);
+    setProcessedByBackend(false);
+    setErrorMessage(null);
+    setPages([]);
+    setPagesError(null);
+    setPagesTruncated(false);
+    setPickedUpIndex(null);
+  }, [tool.id]);
+
+  useEffect(() => {
+    if (!PAGE_TOOLS.has(tool.id)) {
+      setPages([]);
+      setPagesError(null);
+      setPagesTruncated(false);
+      setPagesLoading(false);
+      return;
+    }
+
+    const source = files[0]?.rawFile;
+    if (!source) {
+      setPages([]);
+      setPagesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadThumbs = async () => {
+      setPagesLoading(true);
+      setPagesError(null);
+      setPagesTruncated(false);
+      try {
+        const rendered = await renderPdfPages(source);
+        if (cancelled) return;
+        if (rendered.length > 0) {
+          setPages(rendered);
+          return;
+        }
+        throw new Error("No pages rendered");
+      } catch {
+        try {
+          const data = await apiPdfThumbnails(source);
+          if (cancelled) return;
+          setPages(
+            data.pages.map((page) => ({
+              id: `page-${page.index}-${source.lastModified}`,
+              sourceIndex: page.index,
+              rotate: 0,
+              selected: true,
+              thumbUrl: page.image,
+            }))
+          );
+          setPagesTruncated(data.truncated);
+        } catch {
+          if (!cancelled) {
+            setPages([]);
+            setPagesError("Could not preview pages. Try another PDF.");
+          }
+        }
+      } finally {
+        if (!cancelled) setPagesLoading(false);
+      }
+    };
+
+    loadThumbs();
+    return () => {
+      cancelled = true;
+    };
+  }, [tool.id, sourceFileId]);
 
   // Format file size
   const formatBytes = (bytes: number, decimals = 1) => {
@@ -153,45 +266,40 @@ export default function ToolWorkspace({
     }
   };
 
-  // Add demo sample files if user wants quick test
-  const handleAddSampleFiles = () => {
-    const sampleNames: Record<string, string[]> = {
-      "merge-pdf": ["Technical_Resume_Part1.pdf", "Project_Portfolio.pdf", "Certifications_Appendix.pdf"],
-      "split-pdf": ["Quarterly_Report.pdf"],
-      "rotate-pdf": ["Scanned_Invoice.pdf"],
-      "organize-pdf": ["Meeting_Notes_Full.pdf"],
-      "pdf-compression": ["Annual_Company_Presentation_2026.pdf"],
-      "pdf-to-word": ["Contract_Agreement_Final.pdf"],
-      "word-to-pdf": ["Project_Specification_Draft.docx"],
-      "pdf-to-excel": ["Sales_Tables.pdf"],
-      "pdf-to-image": ["Brochure_Spread.pdf"],
-      "photo-to-pdf": ["Scanned_Receipt_Page1.jpg", "Scanned_Receipt_Page2.png"],
-      "extract-text": ["Policy_Handbook.pdf"],
-      "watermark-pdf": ["Internal_Memo.pdf"],
-      "page-numbers": ["Handbook_Draft.pdf"],
-      "protect-pdf": ["Client_Proposal.pdf"],
-      "unlock-pdf": ["Locked_Statement.pdf"],
-    };
+  const handleAddSampleFiles = async () => {
+    try {
+      setErrorMessage(null);
+      const stamp = Date.now();
+      const pdf = (name: string) => loadSampleFile("/samples/sample.pdf", name, "application/pdf");
+      const loaded: File[] =
+        tool.id === "word-to-pdf"
+          ? [await loadSampleFile("/samples/sample.docx", "Project_Specification_Draft.docx", OFFICE_DOCX)]
+          : tool.id === "excel-to-pdf"
+          ? [await loadSampleFile("/samples/sample.xlsx", "Q3_Budget.xlsx", OFFICE_XLSX)]
+          : tool.id === "ppt-to-pdf"
+          ? [await loadSampleFile("/samples/sample.pptx", "Kickoff_Deck.pptx", OFFICE_PPTX)]
+          : tool.id === "photo-to-pdf"
+          ? [samplePngFile("Scanned_Receipt_Page1.png"), samplePngFile("Scanned_Receipt_Page2.png")]
+          : tool.id === "merge-pdf"
+          ? [
+              await pdf("Technical_Resume_Part1.pdf"),
+              await pdf("Project_Portfolio.pdf"),
+              await pdf("Certifications_Appendix.pdf"),
+            ]
+          : [await pdf(tool.id === "split-pdf" ? "Quarterly_Report.pdf" : "Sample_Document.pdf")];
 
-    const names = sampleNames[tool.id] || ["Sample_Document.pdf"];
-    const samples: UploadedFile[] = names.map((name, i) => {
-      const type = name.endsWith(".docx")
-        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        : name.endsWith(".jpg") || name.endsWith(".png")
-        ? "image/jpeg"
-        : "application/pdf";
-      const mockFile = createMockValidFile(name, type);
-      return {
-        id: `sample-${i}-${Date.now()}`,
-        name,
-        size: (i + 1) * 1.8 * 1024 * 1024,
-        type,
-        status: "ready",
-        rawFile: mockFile,
-      };
-    });
-
-    setFiles((prev) => (tool.multiple ? [...prev, ...samples] : [samples[0]]));
+      const samples: UploadedFile[] = loaded.map((file, index) => ({
+        id: `sample-${index}-${stamp}`,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        status: "ready" as const,
+        rawFile: file,
+      }));
+      setFiles((prev) => (tool.multiple ? [...prev, ...samples] : [samples[0]]));
+    } catch {
+      setErrorMessage("Could not load the sample file. Upload a real document instead.");
+    }
   };
 
   // Remove file
@@ -243,88 +351,27 @@ export default function ToolWorkspace({
     }
   };
 
-  // Client simulation fallback
-  const runClientSimulation = () => {
-    setIsProcessing(true);
-    setProgress(0);
-    setProcessingStage("Preparing files in browser...");
-
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += Math.floor(Math.random() * 15) + 10;
-      if (currentProgress < 35) {
-        setProcessingStage("Simulating document analysis...");
-      } else if (currentProgress < 75) {
-        if (tool.id === "merge-pdf") {
-          setProcessingStage("Simulating PDF page merge...");
-        } else if (tool.id === "pdf-compression") {
-          setProcessingStage("Simulating PDF stream compression...");
-        } else if (tool.id === "pdf-to-word") {
-          setProcessingStage("Simulating Word DOCX conversion...");
-        } else if (tool.id === "word-to-pdf") {
-          setProcessingStage("Simulating PDF rendering...");
-        } else {
-          setProcessingStage("Simulating photo collation...");
-        }
-      } else if (currentProgress < 95) {
-        setProcessingStage("Finalizing demo output file...");
-      }
-
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-        setProgress(100);
-        setTimeout(() => {
-          setIsProcessing(false);
-          setIsDone(true);
-          setProcessedByBackend(false);
-
-          const firstFileName = files[0].name.replace(/\.[^/.]+$/, "");
-          const demoNames: Record<string, string> = {
-            "merge-pdf": `${firstFileName}_merged.pdf`,
-            "split-pdf": options.splitMode === "each" ? `${firstFileName}_pages.zip` : `${firstFileName}_split.pdf`,
-            "rotate-pdf": `${firstFileName}_rotated.pdf`,
-            "organize-pdf": `${firstFileName}_organized.pdf`,
-            "pdf-compression": `${firstFileName}_compressed.pdf`,
-            "pdf-to-word": `${firstFileName}.docx`,
-            "word-to-pdf": `${firstFileName}.pdf`,
-            "pdf-to-excel": `${firstFileName}.xlsx`,
-            "pdf-to-image": `${firstFileName}_images.zip`,
-            "photo-to-pdf": `${firstFileName}_photos.pdf`,
-            "extract-text": `${firstFileName}.txt`,
-            "watermark-pdf": `${firstFileName}_watermarked.pdf`,
-            "page-numbers": `${firstFileName}_numbered.pdf`,
-            "protect-pdf": `${firstFileName}_protected.pdf`,
-            "unlock-pdf": `${firstFileName}_unlocked.pdf`,
-          };
-          if (tool.id === "pdf-compression") {
-            const origTotal = files.reduce((acc, f) => acc + f.size, 0);
-            setFileSavings({
-              originalSize: origTotal,
-              compressedSize: Math.round(origTotal * 0.35),
-              percent: 65,
-            });
-          }
-          setDownloadFileName(demoNames[tool.id] || `${firstFileName}_processed.pdf`);
-        }, 500);
-      } else {
-        setProgress(currentProgress);
-      }
-    }, 200);
-  };
-
   const validateBeforeProcess = (): string | null => {
     if (files.length === 0) return "Add a file first.";
     if (tool.id === "merge-pdf" && files.length < 2) return "Add at least two PDFs to merge.";
-    if (tool.id === "split-pdf" && options.splitMode === "range" && !options.pageRange?.trim()) {
-      return "Enter a page range such as 1-3,5.";
+    if (tool.id === "split-pdf") {
+      if (pages.length === 0) return "Wait for the page preview, or upload the PDF again.";
+      if (pages.filter((page) => page.selected).length === 0) return "Click the pages you want to keep.";
     }
-    if (tool.id === "organize-pdf" && !options.pageRange?.trim()) {
-      return "Enter the pages to keep or delete.";
+    if ((tool.id === "organize-pdf" || tool.id === "rotate-pdf") && pages.length === 0) {
+      return "Wait for the page preview, or upload the PDF again.";
     }
     if (tool.id === "pdf-to-image" && options.imagePages === "range" && !options.pageRange?.trim()) {
       return "Enter the pages to convert.";
     }
-    if (tool.id === "watermark-pdf" && !options.watermarkText?.trim()) return "Enter watermark text.";
+    if (tool.id === "watermark-pdf") {
+      if (options.watermarkMode === "logo" && !options.watermarkLogoFile) {
+        return "Upload a logo image to watermark with.";
+      }
+      if (options.watermarkMode !== "logo" && !options.watermarkText?.trim()) {
+        return "Enter watermark text.";
+      }
+    }
     if (tool.id === "protect-pdf") {
       if (!options.password || options.password.length < 4) return "Enter a password of at least 4 characters.";
       if (options.password !== options.confirmPassword) return "Passwords do not match.";
@@ -340,25 +387,26 @@ export default function ToolWorkspace({
       return;
     }
 
-    if (isOnline) {
-      setIsProcessing(true);
-      setProgress(10);
-      setErrorMessage(null);
-      setProcessingStage("Preparing files for processing...");
+    setIsProcessing(true);
+    setProgress(10);
+    setErrorMessage(null);
+    setProcessingStage("Preparing files for processing...");
 
-      try {
-        const rawFiles: File[] = files.map((f) => {
-          if (f.rawFile) return f.rawFile;
-          return createMockValidFile(f.name, f.type);
-        });
+    try {
+      const rawFiles: File[] = files.map((f) => {
+        if (!f.rawFile) throw new Error("Upload the file again. The original file is missing.");
+        return f.rawFile;
+      });
 
-        setProgress(30);
-        setProcessingStage(`Running ${tool.name}...`);
+      setProgress(30);
+      setProcessingStage(`Running ${tool.name}...`);
 
-        let receivedBlob: Blob;
-        let finalFilename = "";
-        const source = rawFiles[0];
-        const pageRange = options.pageRange?.trim() || "1";
+      let receivedBlob: Blob;
+      let finalFilename = "";
+      const source = rawFiles[0];
+      const pageRange = options.pageRange?.trim() || "all";
+      const selectedPages = pages.filter((page) => page.selected).map((page) => page.sourceIndex + 1);
+      const splitRange = selectedPages.length ? selectedPages.join(",") : "all";
 
         if (tool.id === "merge-pdf") {
           const res = await apiMergePdf(rawFiles);
@@ -380,6 +428,10 @@ export default function ToolWorkspace({
           const res = await apiWordToPdf(source, options.pdfStandard || "pdf1.7");
           receivedBlob = res.blob;
           finalFilename = res.filename;
+        } else if (tool.id === "excel-to-pdf" || tool.id === "ppt-to-pdf") {
+          const res = await apiOfficeToPdf(source, options.pdfStandard || "pdf1.7");
+          receivedBlob = res.blob;
+          finalFilename = res.filename;
         } else if (tool.id === "photo-to-pdf") {
           const res = await apiPhotoToPdf(
             rawFiles,
@@ -390,8 +442,8 @@ export default function ToolWorkspace({
           receivedBlob = res.blob;
           finalFilename = res.filename;
         } else if (tool.id === "pdf-to-image") {
-          const pages = options.imagePages === "range" ? pageRange : "all";
-          const res = await apiPdfToImage(source, pages, options.imageFormat || "png", options.imageDpi || 150);
+          const imagePages = options.imagePages === "range" ? pageRange : "all";
+          const res = await apiPdfToImage(source, imagePages, options.imageFormat || "png", options.imageDpi || 150);
           receivedBlob = res.blob;
           finalFilename = res.filename;
         } else if (tool.id === "pdf-to-excel") {
@@ -399,19 +451,29 @@ export default function ToolWorkspace({
           receivedBlob = res.blob;
           finalFilename = res.filename;
         } else if (tool.id === "watermark-pdf") {
-          const res = await apiWatermarkPdf(source, options.watermarkText || "CONFIDENTIAL", options.watermarkOpacity ?? 0.25);
+          const res = await apiWatermarkPdf(source, options.watermarkText || "CONFIDENTIAL", options.watermarkOpacity ?? 0.25, {
+            mode: options.watermarkMode || "text",
+            position: options.watermarkPosition || "center",
+            rotation: options.watermarkRotation ?? 45,
+            scale: options.watermarkScale ?? 0.28,
+            logo: options.watermarkLogoFile,
+          });
           receivedBlob = res.blob;
           finalFilename = res.filename;
         } else if (tool.id === "split-pdf") {
-          const res = await apiSplitPdf(source, options.splitMode || "range", pageRange);
-          receivedBlob = res.blob;
-          finalFilename = res.filename;
-        } else if (tool.id === "rotate-pdf") {
-          const res = await apiRotatePdf(source, options.rotateAngle || 90, options.pageRange?.trim() || "all");
-          receivedBlob = res.blob;
-          finalFilename = res.filename;
-        } else if (tool.id === "organize-pdf") {
-          const res = await apiOrganizePdf(source, options.organizeMode || "keep", pageRange);
+          const res = await apiSplitPdf(source, "each", splitRange);
+          receivedBlob = new Blob([res.blob], { type: "application/zip" });
+          finalFilename = res.filename.toLowerCase().endsWith(".zip")
+            ? res.filename
+            : `${res.filename.replace(/\.[^.]+$/, "")}_pages.zip`;
+        } else if (tool.id === "rotate-pdf" || tool.id === "organize-pdf") {
+          const res = await apiOrganizePdf(
+            source,
+            options.organizeMode || "keep",
+            pageRange,
+            pages.map((page) => page.sourceIndex),
+            pages.map((page) => page.rotate)
+          );
           receivedBlob = res.blob;
           finalFilename = res.filename;
         } else if (tool.id === "protect-pdf") {
@@ -441,61 +503,54 @@ export default function ToolWorkspace({
         setProcessingStage("Preparing your processed file...");
         await new Promise((r) => setTimeout(r, 250));
 
-        setProgress(100);
-        setResultBlob(receivedBlob);
-        setDownloadFileName(finalFilename);
-        setProcessedByBackend(true);
-        setIsProcessing(false);
-        setIsDone(true);
-        return;
-      } catch (err: any) {
-        console.warn("Processing failed, using client simulation fallback:", err);
-        // Fall back seamlessly to client simulation
-      }
+      setProgress(100);
+      setResultBlob(receivedBlob);
+      setDownloadFileName(finalFilename);
+      setProcessedByBackend(true);
+      setIsProcessing(false);
+      setIsDone(true);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not process that file.";
+      setIsProcessing(false);
+      setIsDone(false);
+      setProcessedByBackend(false);
+      setResultBlob(null);
+      setErrorMessage(message);
     }
-
-    // Fallback: Client simulation
-    runClientSimulation();
   };
 
   // Trigger file download
   const handleDownload = () => {
     // If real file received from backend
-    if (resultBlob) {
-      const url = URL.createObjectURL(resultBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = downloadFileName || "processed_file.pdf";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    if (!resultBlob) {
+      setErrorMessage("The real file is not ready yet. Process the document again.");
       return;
     }
-
-    // Fallback demo blob
-    let mimeType = "application/pdf";
-    let content = "%PDF-1.4\n%Simple PDF by TFRENZY Export (Demo Mode)\n";
-
-    if (downloadFileName.endsWith(".docx")) {
-      mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      content = "PK\x03\x04... [Simple PDF Converted DOCX file content]";
-    } else if (downloadFileName.endsWith(".xlsx")) {
-      mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-      content = "PK\x03\x04... [Simple PDF Excel workbook]";
-    } else if (downloadFileName.endsWith(".zip")) {
-      mimeType = "application/zip";
-      content = "PK\x03\x04... [Simple PDF ZIP bundle]";
-    } else if (downloadFileName.endsWith(".txt")) {
-      mimeType = "text/plain";
-      content = "Simple PDF extracted text (demo mode)";
-    }
-
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
+    const filename =
+      downloadFileName ||
+      (tool.id === "split-pdf" || tool.id === "pdf-to-image"
+        ? "simplepdf_pages.zip"
+        : tool.id === "pdf-to-word"
+        ? "document.docx"
+        : tool.id === "pdf-to-excel"
+        ? "document.xlsx"
+        : "processed_file.pdf");
+    const mime = filename.toLowerCase().endsWith(".docx")
+      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : filename.toLowerCase().endsWith(".xlsx")
+      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : filename.toLowerCase().endsWith(".zip")
+      ? "application/zip"
+      : filename.toLowerCase().endsWith(".txt")
+      ? "text/plain"
+      : filename.toLowerCase().endsWith(".pdf")
+      ? "application/pdf"
+      : resultBlob.type;
+    const typedBlob = resultBlob.type === mime ? resultBlob : new Blob([resultBlob], { type: mime });
+    const url = URL.createObjectURL(typedBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = downloadFileName || "processed_file.pdf";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -513,6 +568,10 @@ export default function ToolWorkspace({
     setResultBlob(null);
     setProcessedByBackend(false);
     setErrorMessage(null);
+    setPages([]);
+    setPagesError(null);
+    setPagesTruncated(false);
+    setOptions((prev) => ({ ...prev, watermarkLogoFile: null }));
   };
 
   return (
@@ -554,7 +613,9 @@ export default function ToolWorkspace({
             </h2>
 
             <p className="text-sm text-zinc-600 mb-6">
-              Your document is ready for download. Clean, secure, and ready to share.
+              {tool.id === "split-pdf"
+                ? `Each page is its own PDF, packed in ${downloadFileName || "a ZIP file"}.`
+                : "Your document is ready for download. Clean, secure, and ready to share."}
             </p>
 
             {/* Compression savings badge if applicable */}
@@ -730,7 +791,13 @@ export default function ToolWorkspace({
                       Uploaded Documents ({files.length})
                     </h3>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      {tool.id === "merge-pdf"
+                      {tool.id === "organize-pdf"
+                        ? "Drag pages to reorder. Turn or remove pages, then save."
+                        : tool.id === "split-pdf"
+                        ? "Click the pages you want to keep. The preview shows the real page."
+                        : tool.id === "rotate-pdf"
+                        ? "Turn any page with the buttons. The preview rotates as you click."
+                        : tool.id === "merge-pdf"
                         ? "Pick up any card and drop it where you want to arrange the order."
                         : "Verify your documents before processing."}
                     </p>
@@ -792,8 +859,42 @@ export default function ToolWorkspace({
                   </div>
                 )}
 
+                {PAGE_TOOLS.has(tool.id) && (
+                  <PagePreviewGrid
+                    mode={tool.id === "split-pdf" ? "split" : tool.id === "rotate-pdf" ? "rotate" : "organize"}
+                    pages={pages}
+                    loading={pagesLoading}
+                    error={pagesError}
+                    onReorder={(from, to) => {
+                      setPages((prev) => {
+                        const next = [...prev];
+                        const [moved] = next.splice(from, 1);
+                        next.splice(to, 0, moved);
+                        return next;
+                      });
+                    }}
+                    onRotate={(id, delta) => {
+                      setPages((prev) =>
+                        prev.map((page) => (page.id === id ? { ...page, rotate: nextAngle(page.rotate, delta) } : page))
+                      );
+                    }}
+                    onDelete={(id) => setPages((prev) => prev.filter((page) => page.id !== id))}
+                    onToggleSelect={(id) => {
+                      setPages((prev) =>
+                        prev.map((page) => (page.id === id ? { ...page, selected: !page.selected } : page))
+                      );
+                    }}
+                    onRotateAll={(delta) => {
+                      setPages((prev) => prev.map((page) => ({ ...page, rotate: nextAngle(page.rotate, delta) })));
+                    }}
+                    onSelectAll={(selected) => {
+                      setPages((prev) => prev.map((page) => ({ ...page, selected })));
+                    }}
+                  />
+                )}
+
                 {/* File Cards Grid with Visual Pick & Drop Reordering */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-5">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-5 ${PAGE_TOOLS.has(tool.id) ? "hidden" : ""}`}>
                   {files.map((file, idx) => {
                     const isPickedUp = pickedUpIndex === idx;
                     const isTargetWhenPickedUp = pickedUpIndex !== null && pickedUpIndex !== idx;

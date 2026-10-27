@@ -6,6 +6,8 @@ export type ToolId =
   | "pdf-compression"
   | "pdf-to-word"
   | "word-to-pdf"
+  | "excel-to-pdf"
+  | "ppt-to-pdf"
   | "pdf-to-excel"
   | "pdf-to-image"
   | "photo-to-pdf"
@@ -53,6 +55,14 @@ export interface UploadedFile {
   rawFile?: File;
 }
 
+export interface PdfPageItem {
+  id: string;
+  sourceIndex: number;
+  rotate: 0 | 90 | 180 | 270;
+  thumbUrl: string;
+  selected?: boolean;
+}
+
 export interface ToolOptions {
   compressionLevel?: "extreme" | "recommended" | "less";
   sortOrder?: "custom" | "az" | "za";
@@ -67,6 +77,11 @@ export interface ToolOptions {
   rotateAngle?: 90 | 180 | 270;
   watermarkText?: string;
   watermarkOpacity?: number;
+  watermarkMode?: "text" | "logo";
+  watermarkPosition?: "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  watermarkRotation?: 0 | 45 | 90 | 315;
+  watermarkScale?: number;
+  watermarkLogoFile?: File | null;
   pageNumberPosition?: "header-left" | "header-center" | "header-right" | "footer-left" | "footer-center" | "footer-right";
   pageNumberStart?: number;
   pageNumberFormat?: "number" | "page-n" | "page-n-of-n";

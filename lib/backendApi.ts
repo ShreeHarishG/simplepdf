@@ -47,7 +47,7 @@ async function postForm(path: string, formData: FormData, fallbackName: string):
 export async function checkBackendHealth(): Promise<BackendHealthResponse> {
   const startTime = performance.now();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2500);
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
 
   try {
     const response = await fetch(`${BACKEND_URL}/`, {
@@ -117,6 +117,36 @@ export async function apiWordToPdf(file: File, pdfStandard: string = "pdf1.7"): 
   return postForm("/api/word-to-pdf", formData, `${file.name.replace(/\.[^/.]+$/, "")}.pdf`);
 }
 
+export async function apiOfficeToPdf(file: File, pdfStandard: string = "pdf1.7"): Promise<FileResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("pdf_standard", pdfStandard);
+  return postForm("/api/office-to-pdf", formData, `${file.name.replace(/\.[^/.]+$/, "")}.pdf`);
+}
+
+export interface PdfThumbnailPage {
+  index: number;
+  width: number;
+  height: number;
+  image: string;
+}
+
+export async function apiPdfThumbnails(
+  file: File
+): Promise<{ pageCount: number; truncated: boolean; pages: PdfThumbnailPage[] }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${BACKEND_URL}/api/pdf-thumbnails`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(raw || "Could not load page thumbnails");
+  }
+  return response.json();
+}
+
 export async function apiPhotoToPdf(
   files: File[],
   orientation: string = "portrait",
@@ -151,20 +181,45 @@ export async function apiPdfToExcel(file: File): Promise<FileResult> {
   return postForm("/api/pdf-to-excel", formData, `${file.name.replace(/\.[^/.]+$/, "")}.xlsx`);
 }
 
-export async function apiWatermarkPdf(file: File, watermarkText: string, opacity: number): Promise<FileResult> {
+export async function apiWatermarkPdf(
+  file: File,
+  watermarkText: string,
+  opacity: number,
+  extras?: {
+    mode?: "text" | "logo";
+    position?: string;
+    rotation?: number;
+    scale?: number;
+    logo?: File | null;
+  }
+): Promise<FileResult> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("watermark_text", watermarkText);
   formData.append("opacity", String(opacity));
+  formData.append("mode", extras?.mode || "text");
+  formData.append("position", extras?.position || "center");
+  formData.append("rotation", String(extras?.rotation ?? 45));
+  formData.append("scale", String(extras?.scale ?? 0.28));
+  if (extras?.mode === "logo" && extras.logo) {
+    formData.append("logo", extras.logo);
+  }
   return postForm("/api/watermark-pdf", formData, "watermarked.pdf");
 }
 
 export async function apiSplitPdf(file: File, mode: string, pages: string): Promise<FileResult> {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("mode", mode);
-  formData.append("pages", pages);
-  return postForm("/api/split-pdf", formData, "simplepdf_split.pdf");
+  formData.append("mode", mode || "each");
+  formData.append("pages", pages || "all");
+  const stem = file.name.replace(/\.[^/.]+$/, "") || "document";
+  const result = await postForm("/api/split-pdf", formData, `${stem}_pages.zip`);
+  const bytes = new Uint8Array(await result.blob.slice(0, 2).arrayBuffer());
+  const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
+  const filename = isZip && !result.filename.toLowerCase().endsWith(".zip")
+    ? result.filename.replace(/\.[^.]+$/, "") + "_pages.zip"
+    : result.filename;
+  return { blob: result.blob, filename };
 }
 
 export async function apiRotatePdf(file: File, angle: number, pages: string): Promise<FileResult> {
@@ -175,11 +230,21 @@ export async function apiRotatePdf(file: File, angle: number, pages: string): Pr
   return postForm("/api/rotate-pdf", formData, "simplepdf_rotated.pdf");
 }
 
-export async function apiOrganizePdf(file: File, mode: string, pages: string): Promise<FileResult> {
+export async function apiOrganizePdf(
+  file: File,
+  mode: string,
+  pages: string,
+  order?: number[],
+  rotations?: number[]
+): Promise<FileResult> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("mode", mode);
   formData.append("pages", pages);
+  if (order && order.length > 0) {
+    formData.append("order", order.join(","));
+    formData.append("rotations", (rotations || []).join(","));
+  }
   return postForm("/api/organize-pdf", formData, "simplepdf_organized.pdf");
 }
 

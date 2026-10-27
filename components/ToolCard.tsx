@@ -18,6 +18,8 @@ import {
   Hash,
   Lock,
   Unlock,
+  Sheet,
+  Presentation,
 } from "lucide-react";
 import { ToolDefinition } from "@/types/tools";
 
@@ -44,6 +46,10 @@ function ToolIcon({ tool }: { tool: ToolDefinition }) {
       return <FileText className={className} style={style} />;
     case "word-to-pdf":
       return <FileCheck2 className={className} style={style} />;
+    case "excel-to-pdf":
+      return <Sheet className={className} style={style} />;
+    case "ppt-to-pdf":
+      return <Presentation className={className} style={style} />;
     case "pdf-to-excel":
       return <Table2 className={className} style={style} />;
     case "pdf-to-image":
